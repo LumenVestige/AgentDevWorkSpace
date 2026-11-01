@@ -1,10 +1,10 @@
 #!/bin/sh
 # 在项目根目录的 .agents/notes/ 下按模板创建 Note，在任意目录执行都可以。
 set -e
-usage="用法：$0 <proposed|implemented> <feature|fix|update> <topic-in-kebab-case>"
+usage="用法：$0 <proposed|implemented> <feature|fix|del|update> <topic-in-kebab-case>"
 [ $# -eq 3 ] || { echo "$usage" >&2; exit 1; }
 case $1 in proposed|implemented) ;; *) echo "$usage" >&2; exit 1 ;; esac
-case $2 in feature|fix|update) ;; *) echo "$usage" >&2; exit 1 ;; esac
+case $2 in feature|fix|del|update) ;; *) echo "$usage" >&2; exit 1 ;; esac
 echo "$3" | grep -qE '^[a-z0-9]+(-[a-z0-9]+)*$' || { echo "topic 只能用小写字母、数字和 -：$3" >&2; exit 1; }
 here=$(cd "$(dirname "$0")" && pwd)
 . "$here/../lib/root.sh"
