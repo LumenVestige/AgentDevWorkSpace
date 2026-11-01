@@ -2,7 +2,7 @@
 """在项目根目录的 .agents/notes/ 下创建 Note，并填入能从脚本获取的内容，在任意目录执行都可以。
 
 用法："$(git config agentskill.python)" create.py <topic-in-kebab-case>
-文件名：.agents/notes/yyyy-mm-dd-HHMMSS-<topic>.md，平铺在 notes/ 下。
+文件名：.agents/notes/yy-MM-dd-HH-mm-ss-<topic>.md，平铺在 notes/ 下。
 
 自动填充：
 - `时间：` 摘要时间戳，取当前时间；
@@ -51,13 +51,13 @@ def main():
     stamp = f"时间：{now:%Y-%m-%d %H:%M:%S}"
     commits = [oneline for _, oneline in (unrecorded_commits(root, load_config(root)) or [])]
 
-    same = sorted(notes.glob(f"????-??-??-??????-{topic}.md"))
+    same = sorted(notes.glob(f"??-??-??-??-??-??-{topic}.md"))
     if same:
         file = same[-1]
         text = file.read_text(encoding="utf-8")
         text = TIME.sub(stamp, text, count=1) if TIME.search(text) else text
     else:
-        file = notes / f"{now:%Y-%m-%d-%H%M%S}-{topic}.md"
+        file = notes / f"{now:%y-%m-%d-%H-%M-%S}-{topic}.md"
         text = TIME.sub(stamp, (HERE / "template.md").read_text(encoding="utf-8"), count=1)
     file.write_text(fill_commits(text, commits), encoding="utf-8")
     print(file)

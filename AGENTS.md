@@ -18,7 +18,7 @@
 
 改变行为、架构、接口或数据格式的改动，写一条 Note：
 
-- 路径：`.agents/notes/yyyy-mm-dd-HHMMSS-<topic>.md`，平铺在 `notes/` 下，时间取首次创建时刻（精确到秒），topic 用小写字母加 `-`，例如 `.agents/notes/2026-08-25-143005-local-cli-status-restart.md`。
+- 路径：`.agents/notes/yy-MM-dd-HH-mm-ss-<topic>.md`，平铺在 `notes/` 下，时间取首次创建时刻（精确到秒），topic 用小写字母加 `-`，例如 `.agents/notes/26-08-25-14-30-05-local-cli-status-restart.md`。
 - 内容：`## Outcome` 写改了什么、现在的行为；`## Verification` 写跑了哪些检查、哪些没覆盖。标题下的 `时间：` 和 Git 提交一节由 `create.py` 填写。
 - 创建：`"$(git config agentskill.python)" "$(git config agentskill.path)/notes/create.py" <topic>`（在项目内任意目录执行）。自动填入当前时间和尚未记录到任何 Note 的提交；同一 topic 已有 Note 时不新建，刷新时间并把提交追加到原文件。
 - 同一主题有后续改动时更新原文件：再次以同一 topic 运行 `create.py`，然后改写 Outcome / Verification。
@@ -37,6 +37,6 @@
 | `[fix]` | bug 修复 |
 | `[feature]` | 新增业务功能 |
 | `[del]` | 删除代码、功能或文件 |
-| `[update]` | 代码逻辑更新；不属于以上三类时的兜底标签 |
+| `[update]` | 代码逻辑更新；不属于以上三类时的兜底标签；多件事合并在一笔提交时也用它 |
 
-一笔提交只做一件事；不同标签的改动混在一起时拆开提交。
+一笔提交包含多件事时，不必拆开，统一使用 `[update]` 标签,但是提交message需要列举改动,多个修改用分号(;)字符隔开。
