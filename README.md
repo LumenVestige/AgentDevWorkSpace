@@ -34,7 +34,8 @@ sh <子目录>/setup.sh
 
 ```
 AGENTS.md                  规则
-setup.sh                   项目初始化
+setup.sh                   → scripts/setup.sh 的软链接
+scripts/setup.sh           项目初始化
 lib/root.sh                确定项目根目录
 git/hooks/commit-msg       提交标签校验
 notes/create.py, template.md  创建 Note
