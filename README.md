@@ -24,7 +24,7 @@ sh <子目录>/setup.sh
 - 在项目根目录创建相对软链接 `AGENTS.md → <子目录>/AGENTS.md` 和 `CLAUDE.md → AGENTS.md`（已有同名文件则跳过）；
 - 创建 `.agents/tmp/`（临时产物）和 `.agents/notes/`（Note 记录）；
 - 为当前项目安装 `commit-msg` hook，检查 `[fix]` / `[feature]` / `[del]` / `[update]` 标签；
-- 把 AgentSkill 目录、两个软链接和 `.agents/tmp/` 写入项目的 `.git/info/exclude`，不污染项目仓库。
+- 把 `.agents/` 写入项目根目录的 `.gitignore`（已有则跳过）；AgentSkill 目录和两个软链接写入 `.git/info/exclude`。
 
 可重复执行。
 

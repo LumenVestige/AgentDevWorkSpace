@@ -8,14 +8,14 @@
 
 ## .agents/ 目录
 
-项目根目录下的 `.agents/` 只存放：
+项目根目录下的 `.agents/` 已加入 `.gitignore`，不提交，只存放：
 
-- `tmp/`：临时产物，不提交；
-- `notes/`：Note 记录，随代码一起提交。
+- `tmp/`：临时产物；
+- `notes/`：Note 记录。
 
 ## Note
 
-改变行为、架构、接口或数据格式的改动，在同一笔提交里写一条 Note：
+改变行为、架构、接口或数据格式的改动，写一条 Note：
 
 - 路径：`.agents/notes/<proposed|implemented>/<feature|fix|del|update>/yyyy-mm-dd-<topic>.md`，日期取首次写的那天，topic 用小写字母加 `-`，例如 `.agents/notes/implemented/feature/2026-08-25-local-cli-status-restart.md`。
 - 内容：`## Outcome` 写改了什么、现在的行为；`## Verification` 写跑了哪些检查、哪些没覆盖。

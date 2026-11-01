@@ -28,7 +28,13 @@ if [ ! -e CLAUDE.md ] && [ ! -L CLAUDE.md ]; then
 fi
 
 mkdir -p .agents/tmp .agents/notes
-ignore /.agents/tmp/
+
+# .agents/ 写入项目根目录的 .gitignore。已有任一等价写法（.agents、.agents/、/.agents、/.agents/）时不重复添加；
+# 文件末尾缺少换行时先补一个，避免与最后一行拼接。
+if ! grep -qxE '/?\.agents/?' .gitignore 2>/dev/null; then
+  [ ! -s .gitignore ] || [ -z "$(tail -c1 .gitignore)" ] || echo >> .gitignore
+  echo /.agents/ >> .gitignore
+fi
 
 # hook 只转发到 AgentSkill 中的脚本，AgentSkill 更新后自动生效；不覆盖项目已有的其他 hook。
 hooks=$(git rev-parse --git-path hooks)
