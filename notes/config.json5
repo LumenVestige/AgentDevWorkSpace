@@ -1,0 +1,19 @@
+// Note 配置。setup.sh 首次接入时复制到项目的 .agents/config/notes.json5，之后不覆盖。
+// 缺少的字段取 AgentSkill 中 notes/config.json5 的默认值，可以只保留需要修改的字段。
+{
+  // Note 开关。false 时 verify.py 不触发 Note，也不按上限删除。
+  enabled: true,
+  // 保留的 Note 上限。超出时 verify.py 按文件名中的时间删除最早的 Note。
+  max_notes: 30,
+  // 触发 Note 的扫描规则（verify.py 判断是否触发、create.py 填入提交时共用）。
+  scan: {
+    // 基线之后存在未记录到任何 Note 的提交时触发。false 时不按提交触发。
+    commits: true,
+    // 是否计入 merge 提交。
+    include_merges: false,
+    // 只统计改动了这些路径的提交（git pathspec，相对项目根目录），空数组表示全部，例如 ["src", "lib"]。
+    paths: [],
+    // 不统计只改动了这些路径的提交（git pathspec），例如 ["docs", "*.md"]。
+    exclude_paths: [],
+  },
+}

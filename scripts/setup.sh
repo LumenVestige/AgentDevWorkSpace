@@ -33,7 +33,10 @@ if [ ! -e CLAUDE.md ] && [ ! -L CLAUDE.md ]; then
   ln -s AGENTS.md CLAUDE.md && ignore /CLAUDE.md
 fi
 
-mkdir -p .agents/tmp .agents/notes
+mkdir -p .agents/tmp .agents/notes .agents/config
+
+# Note 配置：开关、上限、触发 Note 的扫描规则。已有时不覆盖；缺少的键由脚本取 notes/config.json5 的默认值。
+[ -e .agents/config/notes.json5 ] || cp "$skill_dir/notes/config.json5" .agents/config/notes.json5
 
 # .agents/ 写入项目根目录的 .gitignore。已有任一等价写法（.agents、.agents/、/.agents、/.agents/）时不重复添加；
 # 文件末尾缺少换行时先补一个，避免与最后一行拼接。
@@ -71,6 +74,9 @@ if ! "$py" -c '' 2>/dev/null; then
   rm -rf "$venv"
   python3 -m venv "$venv" || { echo "创建 $venv 失败；Debian/Ubuntu 请先安装 python3-venv" >&2; rm -rf "$venv"; exit 1; }
 fi
+
+# 用该虚拟环境的 pip 安装依赖（清单在 deps.sh 中）；已满足时跳过。
+sh "$skill_dir/scripts/deps.sh" "$py"
 
 # verify.py 的提交基线：只检查接入之后的提交。仓库还没有提交时写空，表示从第一笔提交算起。
 [ -e .agents/tmp/note-base ] || { git rev-parse -q --verify HEAD || :; } > .agents/tmp/note-base
