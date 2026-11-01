@@ -70,6 +70,25 @@ if ! "$py" -c '' 2>/dev/null; then
   python3 -m venv "$venv" || { echo "创建 $venv 失败；Debian/Ubuntu 请先安装 python3-venv" >&2; rm -rf "$venv"; exit 1; }
 fi
 
+# verify.py 的提交基线：只检查接入之后的提交。仓库还没有提交时写空，表示从第一笔提交算起。
+[ -e .agents/tmp/note-base ] || { git rev-parse -q --verify HEAD || :; } > .agents/tmp/note-base
+
+# 每轮对话结束时执行 verify.py：注册为 Claude Code 的 Stop hook（项目本地配置，不提交）；已注册时不重复添加。
+ignore /.claude/settings.local.json
+"$py" - <<'PY'
+import json
+from pathlib import Path
+p = Path(".claude/settings.local.json")
+cfg = json.loads(p.read_text() or "{}") if p.exists() else {}
+cmd = ('p=$(git config agentskill.path) && [ -f "$p/notes/verify.py" ] && '
+       'exec "$(git config agentskill.python)" "$p/notes/verify.py"; exit 0  # agentskill')
+stop = cfg.setdefault("hooks", {}).setdefault("Stop", [])
+if not any("# agentskill" in h.get("command", "") for e in stop for h in e.get("hooks", [])):
+    stop.append({"hooks": [{"type": "command", "command": cmd}]})
+    p.parent.mkdir(exist_ok=True)
+    p.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
+PY
+
 # 项目和 AgentSkill 各记一份，在两者的任意目录中都能通过 git config 找到脚本和解释器。
 git config agentskill.path "$skill_dir"
 git config agentskill.python "$py"

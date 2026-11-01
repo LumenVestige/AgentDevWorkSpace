@@ -21,6 +21,9 @@
 - 内容：标题下的 `时间：` 是摘要的时间戳，创建时自动填入，更新 Note 时同步改为当前时间；`## Outcome` 写改了什么、现在的行为；`## Verification` 写跑了哪些检查、哪些没覆盖；涉及 git 提交时，`## Git 提交` 保留对应的 `git log --oneline` 日志，没有提交则删除该节。
 - 创建：`"$(git config agentskill.python)" "$(git config agentskill.path)/notes/create.py" <topic>`（在项目内任意目录执行）。
 - 同一主题有后续改动时更新原文件。
+- 校验：每轮对话结束前运行 `"$(git config agentskill.python)" "$(git config agentskill.path)/notes/verify.py"`（Claude Code 已通过 Stop hook 自动执行）。它检查两件事：
+  - 存在未记录到任何 Note 的提交时，要求写或更新 Note，在 `## Git 提交` 中保留这些提交的 `git log --oneline`；
+  - Note 超过 30 条时，按文件名时间删除最早的。
 
 ## Git 提交
 
