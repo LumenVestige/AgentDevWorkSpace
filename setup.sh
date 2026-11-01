@@ -5,11 +5,15 @@
 set -e
 . "$(cd "$(dirname "$0")" && pwd)/lib/root.sh"
 project_root=$(resolve_root "$1" "$PWD") || true
+# 不在任何项目中、且在 AgentSkill 目录内执行时，初始化 AgentSkill 自身（单独使用或开发 AgentSkill）。
+if [ -z "$project_root" ] && [ -z "$1" ]; then
+  case "$(pwd -P)/" in "$skill_dir"/*) project_root=$skill_dir ;; esac
+fi
 if [ -z "$project_root" ]; then
   echo "未找到项目根目录：请在项目根目录（git 仓库）执行，或传入项目根目录" >&2
   exit 1
 fi
-skill_rel=${skill_dir#"$project_root"/}
+if [ "$project_root" = "$skill_dir" ]; then skill_rel=.; else skill_rel=${skill_dir#"$project_root"/}; fi
 cd "$project_root"
 
 exclude=$(git rev-parse --git-path info/exclude)
@@ -17,7 +21,7 @@ mkdir -p "$(dirname "$exclude")"
 ignore() { grep -qxF "$1" "$exclude" 2>/dev/null || echo "$1" >> "$exclude"; }
 
 # AgentSkill 是独立仓库，不纳入项目版本管理。
-ignore "/$skill_rel/"
+[ "$skill_rel" = . ] || ignore "/$skill_rel/"
 
 # 用相对路径链接，项目移动或换机器后仍有效；项目已有同名文件时不覆盖。
 if [ ! -e AGENTS.md ] && [ ! -L AGENTS.md ]; then
