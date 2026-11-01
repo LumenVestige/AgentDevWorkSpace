@@ -11,6 +11,7 @@
 """
 import json
 import re
+import select
 import sys
 
 from common import git, notes_dir, project_root
@@ -20,11 +21,12 @@ BLOCK = 2  # Claude Code Stop hook：退出码 2 阻止结束，stderr 交给 Ag
 
 
 def hook_input():
-    if sys.stdin is None or sys.stdin.isatty():
-        return {}
+    """Stop hook 会立即写入事件 JSON；手动执行时 stdin 可能是终端或一直不关闭的管道，等不到数据就跳过，避免卡住。"""
     try:
+        if sys.stdin is None or sys.stdin.isatty() or not select.select([sys.stdin], [], [], 1)[0]:
+            return {}
         return json.loads(sys.stdin.read() or "{}")
-    except ValueError:
+    except (OSError, ValueError):
         return {}
 
 
