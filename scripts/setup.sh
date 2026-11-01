@@ -77,6 +77,8 @@ fi
 
 # 用该虚拟环境的 pip 安装依赖（清单在 deps.sh 中）；已满足时跳过。
 sh "$skill_dir/scripts/deps.sh" "$py"
+# 检查虚拟环境与依赖是否安装成功，失败时中止。
+sh "$skill_dir/scripts/check.sh" "$py"
 
 # verify.py 的提交基线：只检查接入之后的提交。仓库还没有提交时写空，表示从第一笔提交算起。
 [ -e .agents/tmp/note-base ] || { git rev-parse -q --verify HEAD || :; } > .agents/tmp/note-base
