@@ -59,8 +59,21 @@ HOOK
   chmod +x "$target"
 done
 
-# 项目和 AgentSkill 各记一份，在两者的任意目录中都能通过 git config agentskill.path 找到脚本。
+# AgentSkill 的 Python 脚本统一用 .agents/tmp/venv 中的解释器。已有且可用时跳过；
+# venv 内含绝对路径，项目移动后无法运行，此时重建。
+venv=.agents/tmp/venv
+py="$project_root/$venv/bin/python"
+if ! "$py" -c '' 2>/dev/null; then
+  command -v python3 >/dev/null || { echo "未找到 python3，请先安装 Python 3.9+" >&2; exit 1; }
+  python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' || { echo "需要 Python 3.9+，当前：$(python3 -V)" >&2; exit 1; }
+  rm -rf "$venv"
+  python3 -m venv "$venv" || { echo "创建 $venv 失败；Debian/Ubuntu 请先安装 python3-venv" >&2; rm -rf "$venv"; exit 1; }
+fi
+
+# 项目和 AgentSkill 各记一份，在两者的任意目录中都能通过 git config 找到脚本和解释器。
 git config agentskill.path "$skill_dir"
+git config agentskill.python "$py"
 git -C "$skill_dir" config agentskill.path "$skill_dir"
+git -C "$skill_dir" config agentskill.python "$py"
 git -C "$skill_dir" config agentskill.root "$project_root"
 echo "已初始化：$project_root（AgentSkill 位于 $skill_rel）"

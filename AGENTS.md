@@ -10,7 +10,7 @@
 
 项目根目录下的 `.agents/` 已加入 `.gitignore`，不提交，只存放：
 
-- `tmp/`：临时产物；
+- `tmp/`：临时产物；`tmp/venv/` 是 `setup.sh` 创建的 Python 环境，AgentSkill 的 Python 脚本都用 `git config agentskill.python` 指向的解释器运行；
 - `notes/`：Note 记录。
 
 ## Note
