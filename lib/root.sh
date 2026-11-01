@@ -16,3 +16,15 @@ resolve_root() {
   done
   git -C "$skill_dir/.." rev-parse --show-toplevel 2>/dev/null
 }
+
+# 非 git 工程：显式传入的目录不在任何 git 仓库中、AgentSkill 位于其下且不是 AgentSkill 自身时，输出该目录。
+# 只接受显式参数，不从执行目录推断，避免把 $HOME 之类的上层目录误当成项目根目录。
+resolve_plain_root() {
+  d=$1
+  [ -n "$d" ] && [ -d "$d" ] || return 1
+  d=$(cd "$d" && pwd -P)
+  case "$d/" in "$skill_dir"/*) return 1 ;; esac
+  case "$skill_dir/" in "$d"/*) ;; *) return 1 ;; esac
+  git -C "$d" rev-parse --git-dir >/dev/null 2>&1 && return 1
+  echo "$d"
+}

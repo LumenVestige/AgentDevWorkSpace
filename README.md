@@ -11,6 +11,10 @@ git clone https://github.com/LumenVestige/AgentSkill.git <任意层级子目录>
 sh <子目录>/setup.sh
 ```
 
+项目根目录不是 git 仓库时，须显式传入根目录：`sh <子目录>/setup.sh <项目根目录>`。此时照常创建软链接、`.agents/`、
+Python 环境和 Stop hook，跳过 `.git/info/exclude`、`commit-msg` hook 和项目的 `git config`（路径只记在 AgentSkill 仓库中）；
+没有提交，Note 不会因提交触发。之后 `git init` 的话，重新执行一次 setup.sh 即可补上跳过的部分。
+
 ## setup.sh 介绍
 
 - 在项目根目录创建相对软链接 `AGENTS.md → <子目录>/AGENTS.md` 和 `CLAUDE.md → AGENTS.md`（已有同名文件则跳过）；
