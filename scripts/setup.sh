@@ -75,11 +75,11 @@ HOOK
   done
 fi
 
-# AgentSkill 的 Python 脚本统一用 .agents/tmp/venv 中的解释器。已有且可用时跳过；
-# venv 内含绝对路径，项目移动后无法运行，此时重建。
+# AgentSkill 的 Python 脚本统一用 .agents/tmp/venv 中的解释器。已有且 pip 可用时跳过；
+# venv 内含绝对路径，项目移动后无法运行；缺少 pip 时 deps.sh 无法安装依赖：两种情况都重建。
 venv=.agents/tmp/venv
 py="$project_root/$venv/bin/python"
-if ! "$py" -c '' 2>/dev/null; then
+if ! "$py" -m pip --version >/dev/null 2>&1; then
   command -v python3 >/dev/null || { echo "未找到 python3，请先安装 Python 3.9+" >&2; exit 1; }
   python3 -c 'import sys; sys.exit(sys.version_info < (3, 9))' || { echo "需要 Python 3.9+，当前：$(python3 -V)" >&2; exit 1; }
   rm -rf "$venv"
