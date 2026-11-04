@@ -22,10 +22,12 @@
 - 内容：`## Outcome` 写改了什么、现在的行为；`## Verification` 写跑了哪些检查、哪些没覆盖。标题下的 `时间：` 和 Git 提交一节由 `create.py` 填写。
 - 创建：`"$(git config agentskill.python)" "$(git config agentskill.path)/notes/create.py" <topic>`（在项目内任意目录执行）。项目不是 git 仓库时没有项目 git config，改用 `.agents/tmp/venv/bin/python <AgentSkill 目录>/notes/create.py <topic>`。自动填入当前时间和尚未记录到任何 Note 的提交。
 - 每条 Note 独立：后续改动写新 Note，不合并到已有 Note，同一 topic 可重复使用。
-- 校验：每轮对话结束前运行 `"$(git config agentskill.python)" "$(git config agentskill.path)/notes/verify.py"`（Claude Code 已通过 Stop hook 自动执行）。它只判断是否需要写 Note，并按上限删除最早的 Note；提示需要写时按上面的方式创建。
+- 校验：每轮对话结束前运行 `"$(git config agentskill.python)" "$(git config agentskill.path)/notes/verify.py"`（Claude Code 已通过 Stop hook 自动执行）。它只判断是否需要写 Note，并按上限删除最早的 Note；提示需要写时按上面的方式创建。运行前先检查自动更新：到期则拉取 AgentSkill（`git pull --ff-only`，工作区有改动时跳过）、重新执行 `setup.sh`，再重新调用 `verify.py` 继续流程。
 - 配置：`.agents/config/notes.json5`（JSON5，每个字段都有注释）
   - `enabled`：是否开启 Note 校验；
   - `max_notes`：保留上限，默认 30；
+  - `auto_update`：是否开启自动更新，默认开启；与 `enabled` 相互独立；
+  - `auto_update_interval_hours`：自动更新的检查时长（小时），默认 24，上次更新时间记在 `.agents/tmp/last-update`；
   - `scan`：触发条件。`commits` 为 true 时存在未记录的提交即触发；`include_merges` 是否计入 merge 提交；`paths` / `exclude_paths` 只统计 / 不统计改动这些路径的提交（git pathspec）。
 
 ## Git 提交

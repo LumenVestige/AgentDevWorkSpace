@@ -5,6 +5,10 @@
   enabled: true,
   // 保留的 Note 上限。超出时 verify.py 按文件名中的时间删除最早的 Note。
   max_notes: 30,
+  // 自动更新开关。true 时 verify.py 运行前检查是否到期，到期则拉取 AgentSkill（git pull --ff-only）、重新执行 setup.sh，再重新调用 verify.py。
+  auto_update: true,
+  // 自动更新的检查时长（小时）。距上次更新（.agents/tmp/last-update）超过该时长即到期。
+  auto_update_interval_hours: 24,
   // 触发 Note 的扫描规则（verify.py 判断是否触发、create.py 填入提交时共用）。
   scan: {
     // 基线之后存在未记录到任何 Note 的提交时触发。false 时不按提交触发。

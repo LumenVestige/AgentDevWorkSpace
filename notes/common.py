@@ -49,6 +49,10 @@ def base_file(root):
     return root / ".agents" / "tmp" / "note-base"
 
 
+def update_stamp_file(root):
+    return root / ".agents" / "tmp" / "last-update"
+
+
 def load_config(root):
     """读取 .agents/config/notes.json5，缺少的键用 AgentSkill 的默认配置 notes/config.json5 补齐。"""
     cfg = json5.loads((HERE / "config.json5").read_text(encoding="utf-8"))

@@ -94,6 +94,9 @@ sh "$skill_dir/scripts/check.sh" "$py"
 # verify.py 的提交基线：只检查接入之后的提交。仓库还没有提交时写空，表示从第一笔提交算起。
 [ -e .agents/tmp/note-base ] || { git rev-parse -q --verify HEAD 2>/dev/null || :; } > .agents/tmp/note-base
 
+# verify.py 自动更新的时间戳：刚初始化完，从现在开始计时。
+date +%s > .agents/tmp/last-update
+
 # 每轮对话结束时执行 verify.py：注册为 Claude Code 的 Stop hook（项目本地配置，不提交）；已注册时不重复添加。
 # 非 git 工程没有项目 git config，命令中直接写解释器和脚本的绝对路径。
 ignore /.claude/settings.local.json
