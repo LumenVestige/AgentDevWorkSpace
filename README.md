@@ -36,7 +36,7 @@ scripts/deps.sh            Python 依赖清单，安装到虚拟环境（setup.s
 scripts/check.sh           检查虚拟环境与依赖（setup.sh 自动调用，也可单独执行）
 lib/root.sh                确定项目根目录
 git/hooks/commit-msg       提交标签校验
-notes/create.py, template.md  创建或更新 Note，自动填入时间与未记录的提交
+notes/create.py, template.md  创建 Note，自动填入时间与未记录的提交
 notes/verify.py            每轮对话结束时判断是否需要写 Note，按上限删除旧 Note
 notes/config.json5         Note 默认配置（JSON5，带字段注释）
 notes/common.py            notes 脚本共用：根目录定位、配置读取、未记录提交扫描
