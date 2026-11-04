@@ -129,7 +129,7 @@ git -C "$skill_dir" config agentskill.path "$skill_dir"
 git -C "$skill_dir" config agentskill.python "$py"
 git -C "$skill_dir" config agentskill.root "$project_root"
 if [ -n "$is_git" ]; then
-  echo "已初始化：$project_root（AgentSkill 位于 $skill_rel）"
+  echo "已初始化：${project_root}（AgentSkill 位于 ${skill_rel}）"
 else
-  echo "已初始化（非 git 工程）：$project_root（AgentSkill 位于 $skill_rel），已跳过 .git/info/exclude、commit-msg hook 和项目 git config"
+  echo "已初始化（非 git 工程）：${project_root}（AgentSkill 位于 ${skill_rel}），已跳过 .git/info/exclude、commit-msg hook 和项目 git config"
 fi

@@ -29,9 +29,9 @@ for spec in $deps; do
   [ "$want" = "$spec" ] && want=
   have=$("$py" -c "import importlib.metadata as m, sys; print(m.version(sys.argv[1]))" "$name" 2>/dev/null)
   if [ -z "$have" ]; then
-    bad "依赖未安装：$spec，请执行 sh $skill_dir/scripts/deps.sh"
+    bad "依赖未安装：${spec}，请执行 sh $skill_dir/scripts/deps.sh"
   elif [ -n "$want" ] && [ "$have" != "$want" ]; then
-    bad "依赖版本不一致：$name 需要 $want，当前 $have，请执行 sh $skill_dir/scripts/deps.sh"
+    bad "依赖版本不一致：$name 需要 ${want}，当前 ${have}，请执行 sh $skill_dir/scripts/deps.sh"
   else
     ok "依赖：$name $have"
   fi
