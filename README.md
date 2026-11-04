@@ -22,7 +22,7 @@ Python 环境和 Stop hook，跳过 `.git/info/exclude`、`commit-msg` hook 和�
 - 在 `.agents/tmp/venv/` 创建 Python 3.9+ 虚拟环境，路径记入 `git config agentskill.python`，后续 Python 脚本都用它运行；
 - 执行 `scripts/deps.sh`，用该虚拟环境的 pip 安装依赖（清单写在 deps.sh 中，已满足时跳过）；
 - 执行 `scripts/check.sh`，检查虚拟环境与依赖是否安装成功，失败时中止；
-- 把 `notes/verify.py` 注册为 Claude Code 的 Stop hook（写入 `.claude/settings.local.json`），每轮对话结束时检查未记录到 Note 的提交和 Note 上限；运行前若距上次更新超过 `auto_update_interval_hours`（默认 24 小时），先拉取 AgentSkill（`git pull --ff-only`，工作区有改动时跳过）并重新执行 setup.sh；
+- 把 `notes/verify.py` 注册为 Claude Code 的 Stop hook（写入 `.claude/settings.local.json`）和 Codex 的 Stop hook（写入 `.codex/hooks.json`），每轮对话结束时检查未记录到 Note 的提交和 Note 上限；运行前若距上次更新超过 `auto_update_interval_hours`（默认 24 小时），先拉取 AgentSkill（`git pull --ff-only`，工作区有改动时跳过）并重新执行 setup.sh。Codex 的项目级 hook 只在项目被信任时加载，未信任时 setup.sh 会提示在 `~/.codex/config.toml` 中加入 `[projects."<项目根目录>"]` 和 `trust_level = "trusted"`；此外 Codex 对 hook 本身还有一道信任，首次启动（以及 hook 命令变更后）会要求确认，选择信任后才会执行；
 - 为当前项目安装 `commit-msg` hook，检查 `[fix]` / `[feature]` / `[del]` / `[update]` 标签；
 - 把 `.agents/` 写入项目根目录的 `.gitignore`（已有则跳过）；AgentSkill 目录和两个软链接写入 `.git/info/exclude`。
 
@@ -37,7 +37,7 @@ scripts/check.sh           检查虚拟环境与依赖（setup.sh 自动调用�
 lib/root.sh                确定项目根目录
 git/hooks/commit-msg       提交标签校验
 notes/create.py, template.md  创建 Note，自动填入时间与未记录的提交
-notes/verify.py            每轮对话结束时按需自动更新，判断是否需要写 Note，按上限删除旧 Note
+notes/verify.py            Claude Code / Codex 的 Stop hook：按需自动更新，判断是否需要写 Note，按上限删除旧 Note
 notes/config.json5         Note 默认配置（JSON5，带字段注释）
 notes/common.py            notes 脚本共用：根目录定位、配置读取、未记录提交扫描
 ```

@@ -97,26 +97,56 @@ sh "$skill_dir/scripts/check.sh" "$py"
 # verify.py 自动更新的时间戳：刚初始化完，从现在开始计时。
 date +%s > .agents/tmp/last-update
 
-# 每轮对话结束时执行 verify.py：注册为 Claude Code 的 Stop hook（项目本地配置，不提交）；已注册时不重复添加。
+# 每轮对话结束时执行 verify.py：注册为 Claude Code（.claude/settings.local.json）和 Codex（.codex/hooks.json）
+# 的 Stop hook。两者的事件结构相同，退出码 2 + stderr 都表示阻止结束并把 stderr 交回 Agent，共用同一条命令。
+# 都是项目本地配置，不提交；已注册时不重复添加。
 # 非 git 工程没有项目 git config，命令中直接写解释器和脚本的绝对路径。
 ignore /.claude/settings.local.json
-AGENTSKILL_GIT="$is_git" AGENTSKILL_PY="$py" AGENTSKILL_DIR="$skill_dir" "$py" - <<'PY'
+ignore /.codex/hooks.json
+AGENTSKILL_GIT="$is_git" AGENTSKILL_PY="$py" AGENTSKILL_DIR="$skill_dir" AGENTSKILL_ROOT="$project_root" "$py" - <<'PY'
 import json
 import os
+import re
+import sys
 from pathlib import Path
-p = Path(".claude/settings.local.json")
-cfg = json.loads(p.read_text() or "{}") if p.exists() else {}
+
+MARK = "# agentskill"
 if os.environ["AGENTSKILL_GIT"]:
     cmd = ('p=$(git config agentskill.path) && [ -f "$p/notes/verify.py" ] && '
-           'exec "$(git config agentskill.python)" "$p/notes/verify.py"; exit 0  # agentskill')
+           f'exec "$(git config agentskill.python)" "$p/notes/verify.py"; exit 0  {MARK}')
 else:
     verify = Path(os.environ["AGENTSKILL_DIR"]) / "notes" / "verify.py"
-    cmd = f'[ -f "{verify}" ] && exec "{os.environ["AGENTSKILL_PY"]}" "{verify}"; exit 0  # agentskill'
-stop = cfg.setdefault("hooks", {}).setdefault("Stop", [])
-if not any("# agentskill" in h.get("command", "") for e in stop for h in e.get("hooks", [])):
-    stop.append({"hooks": [{"type": "command", "command": cmd}]})
-    p.parent.mkdir(exist_ok=True)
-    p.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
+    cmd = f'[ -f "{verify}" ] && exec "{os.environ["AGENTSKILL_PY"]}" "{verify}"; exit 0  {MARK}'
+
+
+def register(path, hook):
+    """把 Stop hook 写进配置文件；已有带标记的命令时不重复添加。"""
+    cfg = json.loads(path.read_text() or "{}") if path.exists() else {}
+    stop = cfg.setdefault("hooks", {}).setdefault("Stop", [])
+    if any(MARK in h.get("command", "") for e in stop for h in e.get("hooks", [])):
+        return
+    stop.append({"hooks": [hook]})
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
+
+
+register(Path(".claude/settings.local.json"), {"type": "command", "command": cmd})
+register(Path(".codex/hooks.json"), {"type": "command", "command": cmd, "statusMessage": "检查 Note"})
+
+# Codex 的项目级 hook 只在项目被信任时加载，这里只提示，不改动用户的全局配置。
+# Codex 对 hook 本身还有一道信任（按命令的哈希），首次启动时在界面中确认，不在这里代替用户决定。
+codex_home = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex")
+root = os.environ["AGENTSKILL_ROOT"]
+try:
+    text = (codex_home / "config.toml").read_text(encoding="utf-8")
+except OSError:
+    text = ""
+quoted = re.escape(root)
+section = re.search(rf'^\[projects\.(?:"{quoted}"|\'{quoted}\')\]\s*$(.*?)(?=^\[|\Z)', text, re.M | re.S)
+if not (section and re.search(r'^\s*trust_level\s*=\s*"trusted"', section.group(1), re.M)):
+    print(f'提示：Codex 的项目级 hook 需要先信任本项目，否则 .codex/hooks.json 不会加载。'
+          f'可在 Codex 中信任本项目，或在 {codex_home / "config.toml"} 中加入：\n'
+          f'[projects."{root}"]\ntrust_level = "trusted"', file=sys.stderr)
 PY
 
 # 项目和 AgentSkill 各记一份，在两者的任意目录中都能通过 git config 找到脚本和解释器。

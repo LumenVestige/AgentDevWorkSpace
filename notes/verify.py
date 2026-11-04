@@ -2,7 +2,7 @@
 """每轮对话结束时执行：判断是否需要触发 Note，并按上限删除旧 Note。Note 的内容由 create.py 填充。
 
 用法："$(git config agentskill.python)" verify.py
-作为 Claude Code Stop hook 时从 stdin 读取事件 JSON；需要写 Note 时以退出码 2 把提示交回 Agent。
+作为 Claude Code / Codex 的 Stop hook 时从 stdin 读取事件 JSON；需要写 Note 时以退出码 2 把提示交回 Agent。
 
 配置：.agents/config/notes.json5（JSON5，字段含义见其中的注释；缺少的键取 notes/config.json5 的默认值）
 - enabled：false 时不触发 Note、不删除。
@@ -25,7 +25,7 @@ import time
 
 from common import HERE, git, load_config, notes_dir, project_root, reset_base, unrecorded_commits, update_stamp_file
 
-BLOCK = 2  # Claude Code Stop hook：退出码 2 阻止结束，stderr 交给 Agent 继续处理
+BLOCK = 2  # Claude Code / Codex 的 Stop hook：退出码 2 阻止结束，stderr 交给 Agent 继续处理
 UPDATED_ENV = "AGENTSKILL_UPDATED"  # 更新后重新调用时设置，避免时间戳写入失败或时长为 0 时无限循环
 PULL_TIMEOUT = 60  # 秒，避免网络问题长时间卡住 Stop hook
 

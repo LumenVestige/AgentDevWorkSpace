@@ -22,7 +22,7 @@
 - 内容：`## Outcome` 写改了什么、现在的行为；`## Verification` 写跑了哪些检查、哪些没覆盖。标题下的 `时间：` 和 Git 提交一节由 `create.py` 填写。
 - 创建：`"$(git config agentskill.python)" "$(git config agentskill.path)/notes/create.py" <topic>`（在项目内任意目录执行）。项目不是 git 仓库时没有项目 git config，改用 `.agents/tmp/venv/bin/python <AgentSkill 目录>/notes/create.py <topic>`。自动填入当前时间和尚未记录到任何 Note 的提交。
 - 每条 Note 独立：后续改动写新 Note，不合并到已有 Note，同一 topic 可重复使用。
-- 校验：每轮对话结束前运行 `"$(git config agentskill.python)" "$(git config agentskill.path)/notes/verify.py"`（Claude Code 已通过 Stop hook 自动执行）。它只判断是否需要写 Note，并按上限删除最早的 Note；提示需要写时按上面的方式创建。运行前先检查自动更新：到期则拉取 AgentSkill（`git pull --ff-only`，工作区有改动时跳过）、重新执行 `setup.sh`，再重新调用 `verify.py` 继续流程。
+- 校验：每轮对话结束前运行 `"$(git config agentskill.python)" "$(git config agentskill.path)/notes/verify.py"`（Claude Code 和 Codex 已通过 Stop hook 自动执行）。它只判断是否需要写 Note，并按上限删除最早的 Note；提示需要写时按上面的方式创建。运行前先检查自动更新：到期则拉取 AgentSkill（`git pull --ff-only`，工作区有改动时跳过）、重新执行 `setup.sh`，再重新调用 `verify.py` 继续流程。
 - 配置：`.agents/config/notes.json5`（JSON5，每个字段都有注释）
   - `enabled`：是否开启 Note 校验；
   - `max_notes`：保留上限，默认 30；
