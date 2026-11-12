@@ -1,8 +1,8 @@
 #!/bin/sh
-# 用法：sh <AgentSkill 路径>/setup.sh [项目根目录]（根目录的 setup.sh 是指向本文件的软链接）
-# 接入 AgentSkill：先执行 scripts/init.sh 初始化项目文件（AGENTS.md / CLAUDE.md 软链接、工作区 agent-workspace/
+# 用法：sh <AgentDevWorkSpace 路径>/setup.sh [项目根目录]（根目录的 setup.sh 是指向本文件的软链接）
+# 接入 AgentDevWorkSpace：先执行 scripts/init.sh 初始化项目文件（AGENTS.md / CLAUDE.md 软链接、工作区 agent-workspace/
 #（含 skills 副本）、.claude/skills 软链接、.gitignore），再安装运行环境：提交校验 hook、Python 虚拟环境与依赖、Stop hook。可重复执行。
-# 项目根目录优先取参数，其次取执行命令的目录，最后取包含 AgentSkill 的上层 git 仓库。
+# 项目根目录优先取参数，其次取执行命令的目录，最后取包含 AgentDevWorkSpace 的上层 git 仓库。
 # 非 git 工程须显式传入项目根目录：照常初始化，跳过 .git/info/exclude 和 commit-msg hook。
 set -e
 # 通过根目录软链接执行时 $0 是软链接本身，先解析到 scripts/setup.sh 再定位同目录的 root.sh。
@@ -13,7 +13,7 @@ if [ "$project_root" = "$skill_dir" ]; then skill_rel=.; else skill_rel=${skill_
 cd "$project_root"
 git_env
 
-# 项目文件的初始化都在 init.sh 中。AgentSkill 初始化自身时不接受显式根目录，在 AgentSkill 目录内不带参数执行。
+# 项目文件的初始化都在 init.sh 中。AgentDevWorkSpace 初始化自身时不接受显式根目录，在 AgentDevWorkSpace 目录内不带参数执行。
 if [ "$project_root" = "$skill_dir" ]; then
   sh "$skill_dir/scripts/init.sh"
 else
@@ -41,7 +41,7 @@ HOOK
   done
 fi
 
-# AgentSkill 的 Python 脚本统一用 agent-workspace/.agent/env/venv 中的解释器。已有且 pip 可用时跳过；
+# AgentDevWorkSpace 的 Python 脚本统一用 agent-workspace/.agent/env/venv 中的解释器。已有且 pip 可用时跳过；
 # venv 内含绝对路径，项目移动后无法运行；缺少 pip 时 deps.sh 无法安装依赖：两种情况都重建。
 venv=agent-workspace/.agent/env/venv
 py="$project_root/$venv/bin/python"
@@ -123,11 +123,11 @@ if not (section and re.search(r'^\s*trust_level\s*=\s*"trusted"', section.group(
           f'[projects."{root}"]\ntrust_level = "trusted"', file=sys.stderr)
 PY
 
-# deps.sh / check.sh 单独执行时，默认从 AgentSkill 仓库的 git config 取解释器。
-# 工作区中的脚本不依赖 git config：按自身位置找到项目，按 agent-workspace/.agent/env/agentskill-path 找到 AgentSkill。
+# deps.sh / check.sh 单独执行时，默认从 AgentDevWorkSpace 仓库的 git config 取解释器。
+# 工作区中的脚本不依赖 git config：按自身位置找到项目，按 agent-workspace/.agent/env/agentskill-path 找到 AgentDevWorkSpace。
 git -C "$skill_dir" config agentskill.python "$py"
 if [ -n "$is_git" ]; then
-  echo "已初始化：${project_root}（AgentSkill 位于 ${skill_rel}）"
+  echo "已初始化：${project_root}（AgentDevWorkSpace 位于 ${skill_rel}）"
 else
-  echo "已初始化（非 git 工程）：${project_root}（AgentSkill 位于 ${skill_rel}），已跳过 .git/info/exclude 和 commit-msg hook"
+  echo "已初始化（非 git 工程）：${project_root}（AgentDevWorkSpace 位于 ${skill_rel}），已跳过 .git/info/exclude 和 commit-msg hook"
 fi

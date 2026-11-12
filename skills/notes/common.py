@@ -1,7 +1,7 @@
 """notes 脚本共用：git 调用、项目根目录定位、配置读取与未记录提交扫描。
 
-脚本在工作区副本 <项目根目录>/agent-workspace/skills/common/notes/ 中运行（init.sh 从 AgentSkill 的 skills/ 复制），
-按自身位置找到项目根目录，按 agent-workspace/.agent/env/agentskill-path 找到 AgentSkill。
+脚本在工作区副本 <项目根目录>/agent-workspace/skills/common/notes/ 中运行（init.sh 从 AgentDevWorkSpace 的 skills/ 复制），
+按自身位置找到项目根目录，按 agent-workspace/.agent/env/agentskill-path 找到 AgentDevWorkSpace。
 """
 import os
 import re
@@ -16,7 +16,7 @@ ENV = ROOT / "agent-workspace" / ".agent" / "env"
 try:
     import json5
 except ImportError:
-    sys.exit(f"缺少依赖 json5：请重新执行 AgentSkill 的 setup.sh，并用 {ENV / 'venv' / 'bin' / 'python'} 运行")
+    sys.exit(f"缺少依赖 json5：请重新执行 AgentDevWorkSpace 的 setup.sh，并用 {ENV / 'venv' / 'bin' / 'python'} 运行")
 
 # hook 环境会导出 GIT_DIR，影响 git -C 的结果。
 for var in ("GIT_DIR", "GIT_WORK_TREE"):
@@ -29,14 +29,14 @@ def git(*args):
 
 
 def project_root():
-    """按本文件的位置取项目根目录；不在工作区副本中运行（例如直接运行 AgentSkill 模板包中的脚本）时报错退出。"""
+    """按本文件的位置取项目根目录；不在工作区副本中运行（例如直接运行 AgentDevWorkSpace 模板包中的脚本）时报错退出。"""
     if [x.name for x in HERE.parents[:3]] != ["common", "skills", "agent-workspace"]:
         sys.exit(f"{HERE} 不是工作区中的 notes skill：请运行 <项目根目录>/agent-workspace/skills/common/notes/ 下的脚本")
     return ROOT
 
 
 def skill_dir():
-    """AgentSkill 仓库目录，由 init.sh 写入；文件缺失或目录不存在时返回 None。"""
+    """AgentDevWorkSpace 仓库目录，由 init.sh 写入；文件缺失或目录不存在时返回 None。"""
     try:
         d = Path((ENV / "agentskill-path").read_text(encoding="utf-8").strip())
     except OSError:

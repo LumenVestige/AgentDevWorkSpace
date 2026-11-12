@@ -1,6 +1,6 @@
 #!/bin/sh
-# 用法：sh <AgentSkill 路径>/scripts/deps.sh [python 解释器]
-# 用指定虚拟环境的 pip 安装 AgentSkill Python 脚本的依赖。解释器默认取 git config agentskill.python（setup.sh 写入，即 agent-workspace/.agent/env/venv）。
+# 用法：sh <AgentDevWorkSpace 路径>/scripts/deps.sh [python 解释器]
+# 用指定虚拟环境的 pip 安装 AgentDevWorkSpace Python 脚本的依赖。解释器默认取 git config agentskill.python（setup.sh 写入，即 agent-workspace/.agent/env/venv）。
 # setup.sh 每次执行都会调用；依赖已满足时 pip 直接跳过。
 set -e
 unset GIT_DIR GIT_WORK_TREE

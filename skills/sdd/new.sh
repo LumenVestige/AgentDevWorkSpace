@@ -1,11 +1,11 @@
 #!/bin/sh
 # 用法（在项目根目录执行）：sh agent-workspace/skills/common/sdd/new.sh <feature|bugfix|change> <名称>
 # 通常通过 new_feature.sh / new_bugfix.sh / new_change.sh 调用。
-# 在当前用户的个人目录下新建 agent-workspace/<个人目录>/specs/ 下的目录（feature 为 NNN-<slug>，bugfix / change 为 NNN-<类型>-<slug>），复制该类型的 spec.md、plan.md、tasks.md 模板，
-# 填入名称、编号、负责人，最后输出目录的路径。
+# 在当前用户的个人目录下新建 agent-workspace/<个人目录>/<类型>/NNN-<slug>/（类型为 feature、bugfix、change），
+# 复制该类型的 spec.md、plan.md、tasks.md 模板，填入名称、编号、负责人，最后输出目录的路径。
 # - 个人目录名同 init.sh：git user.name 的 ASCII 字母转小写，空白、标点和控制字符换成 -，合并连续的 -，去掉首尾的 -；
 # - slug 由名称按同样规则生成，例如 "Login Page" → login-page，中文原样保留；
-# - NNN 取个人目录 specs/ 下已有的最大编号加一（三种类型共用编号），从 001 开始；同类型同名已存在时报错；
+# - NNN 取该类型目录下已有的最大编号加一，每种类型单独编号，从 001 开始；同类型同名已存在时报错；
 # - 模板和约束规范优先取 skills/custom/sdd/，没有时取 skills/common/sdd/。
 set -e
 unset GIT_DIR GIT_WORK_TREE
@@ -28,13 +28,11 @@ if [ -z "$name" ]; then
   echo "用法：sh $(dirname "$0")/new_${type}.sh <名称>" >&2
   exit 1
 fi
-# feature 保持 NNN-<slug>；bugfix、change 在 slug 前加类型，区分 bug 修复和变更。
-s=$(slug "$name")
-if [ -z "$s" ]; then
+feature=$(slug "$name")
+if [ -z "$feature" ]; then
   echo "需求名称中没有可用字符：$name" >&2
   exit 1
 fi
-if [ "$type" = feature ]; then feature=$s; else feature=$type-$s; fi
 
 # 本脚本位于 <项目根目录>/agent-workspace/skills/<common|custom>/sdd/。
 ws=$(cd "$(dirname "$0")/../../.." && pwd -P)
@@ -53,11 +51,11 @@ fi
 
 if [ -d "$ws/skills/custom/sdd/templates" ]; then sdd=custom; else sdd=common; fi
 templates="$ws/skills/$sdd/sdd/templates/$type"
-specs="$ws/$user_dir/specs"
-mkdir -p "$specs"
+type_dir="$ws/$user_dir/$type"
+mkdir -p "$type_dir"
 
 # 同类型同名已存在时报错，不重复创建。
-for d in "$specs"/[0-9][0-9][0-9]-"$feature"; do
+for d in "$type_dir"/[0-9][0-9][0-9]-"$feature"; do
   if [ -d "$d" ]; then
     echo "已存在：${d#"$root"/}" >&2
     exit 1
@@ -66,7 +64,7 @@ done
 
 # 已有的最大编号加一。
 last=0
-for d in "$specs"/[0-9][0-9][0-9]-*; do
+for d in "$type_dir"/[0-9][0-9][0-9]-*; do
   [ -d "$d" ] || continue
   n=$(basename "$d" | cut -c1-3)
   n=$(expr "$n" + 0)
@@ -74,7 +72,7 @@ for d in "$specs"/[0-9][0-9][0-9]-*; do
 done
 num=$(printf '%03d' $((last + 1)))
 
-dir="$specs/$num-$feature"
+dir="$type_dir/$num-$feature"
 mkdir "$dir"
 for f in spec plan tasks; do
   sed -e "s|<需求名称>|$(esc "$name")|g" \
@@ -84,5 +82,4 @@ for f in spec plan tasks; do
       -e "s|skills/common/sdd/constraints.md|skills/$sdd/sdd/constraints.md|g" \
       "$templates/$f.md" > "$dir/$f.md"
 done
-rm -f "$specs/.gitkeep"
 echo "${dir#"$root"/}"

@@ -45,14 +45,14 @@ agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/v
 
 - 基线之后有提交的 hash 没出现在任何人的 Note 中时，提示需要写 Note，按上面的方式创建；只改动各人 `notes/` 的提交不计入；
 - 当前用户的 Note 超过上限时，按文件名中的时间删除最早的，不删除别人的 Note；
-- 运行前先检查自动更新：到期则拉取 AgentSkill（`git pull --ff-only`，工作区有改动时跳过）、重新执行 `setup.sh`，再重新调用 `verify.py` 继续流程。
+- 运行前先检查自动更新：到期则拉取 AgentDevWorkSpace（`git pull --ff-only`，工作区有改动时跳过）、重新执行 `setup.sh`，再重新调用 `verify.py` 继续流程。
 
 ## 配置
 
 `agent-workspace/config/notes.json5`（JSON5，每个字段都有注释；缺少的字段取本 skill 中 `config.json5` 的默认值）：
 
 - `enabled`：是否开启 Note 校验；
-- `max_notes`：每人保留上限，默认 30；
+- `max_notes`：每人保留上限，默认 100；
 - `auto_update`：是否开启自动更新，默认开启；与 `enabled` 相互独立；
 - `auto_update_interval_hours`：自动更新的检查时长（小时），默认 24，上次更新时间记在 `agent-workspace/.agent/env/last-update`；
 - `scan`：触发条件。`commits` 为 true 时存在未记录的提交即触发；`include_merges` 是否计入 merge 提交；`paths` / `exclude_paths` 只统计 / 不统计改动这些路径的提交（git pathspec）。

@@ -1,5 +1,5 @@
 #!/bin/sh
-# 用法：sh <AgentSkill 路径>/scripts/check.sh [python 解释器]
+# 用法：sh <AgentDevWorkSpace 路径>/scripts/check.sh [python 解释器]
 # 检查虚拟环境与依赖是否安装成功：解释器可用、Python 3.9+、位于虚拟环境中、pip 可用、deps.sh 中的依赖已安装且版本一致。
 # setup.sh 安装依赖后自动执行；任一项失败时退出码为 1。
 unset GIT_DIR GIT_WORK_TREE

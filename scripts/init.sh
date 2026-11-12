@@ -1,5 +1,5 @@
 #!/bin/sh
-# 用法：sh <AgentSkill 路径>/scripts/init.sh [项目根目录]
+# 用法：sh <AgentDevWorkSpace 路径>/scripts/init.sh [项目根目录]
 # 初始化项目文件：AGENTS.md / CLAUDE.md 软链接，以及工作区 agent-workspace/（skills、个人目录、config、.agent）、
 # .claude/skills 软链接、Note 配置与基线、.gitignore。setup.sh 会先调用本脚本；单独执行时只初始化项目文件，不安装运行环境。
 # 除 agent-workspace/skills/common/ 每次覆盖外，已有的文件不覆盖，可重复执行。项目根目录的确定方式同 setup.sh。
@@ -25,21 +25,22 @@ case "$user_dir" in skills|config)
   exit 1 ;;
 esac
 
-# AgentSkill 是独立仓库，不纳入项目版本管理。
+# AgentDevWorkSpace 是独立仓库，不纳入项目版本管理。
 [ "$skill_rel" = . ] || ignore "/$skill_rel/"
 
-# 项目没有 AGENTS.md 时用相对路径链接到 AgentSkill 的 AGENTS.md，项目移动或换机器后仍有效。
-# 项目已有自己的 AGENTS.md（普通文件）时不覆盖，把 AgentSkill 的 AGENTS.md 追加到末尾，两者的规则都生效：
-# 追加的内容放在标记之间，再次执行时替换标记之间的内容（随 AgentSkill 更新），不重复追加。
-# AgentSkill 初始化自身时 AGENTS.md 就是 AgentSkill 的，不处理。
-agents_begin='<!-- agentskill:begin 以下内容由 AgentSkill 的 init.sh 追加，重新执行时会被替换，请勿修改 -->'
+# 项目没有 AGENTS.md 时用相对路径链接到 AgentDevWorkSpace 的 AGENTS.md，项目移动或换机器后仍有效。
+# 项目已有自己的 AGENTS.md（普通文件）时不覆盖，把 AgentDevWorkSpace 的 AGENTS.md 追加到末尾，两者的规则都生效：
+# 追加的内容放在标记之间，再次执行时替换标记之间的内容（随 AgentDevWorkSpace 更新），不重复追加。
+# AgentDevWorkSpace 初始化自身时 AGENTS.md 就是 AgentDevWorkSpace 的，不处理。
+agents_begin='<!-- agentskill:begin 以下内容由 AgentDevWorkSpace 的 init.sh 追加，重新执行时会被替换，请勿修改 -->'
 agents_end='<!-- agentskill:end -->'
 if [ ! -e AGENTS.md ] && [ ! -L AGENTS.md ]; then
   ln -s "$skill_rel/AGENTS.md" AGENTS.md && ignore /AGENTS.md
 elif [ "$skill_rel" != . ] && [ -f AGENTS.md ] && [ ! -L AGENTS.md ]; then
   # 去掉已有的标记块和末尾空行，再追加最新内容；内容不变时不改写文件。
-  awk -v b="$agents_begin" -v e="$agents_end" '
-    $0 == b { skip = 1; next }
+  # 开始标记按行首的 "<!-- agentskill:begin" 识别，标记中的说明文字改动后仍能找到旧的标记块。
+  awk -v e="$agents_end" '
+    index($0, "<!-- agentskill:begin") == 1 { skip = 1; next }
     $0 == e { skip = 0; next }
     skip { next }
     /^[[:space:]]*$/ { blank = blank $0 "\n"; next }
@@ -63,11 +64,11 @@ if [ ! -e CLAUDE.md ] && [ ! -L CLAUDE.md ]; then
 fi
 
 # 工作区 agent-workspace/：
-# - skills/common/：AgentSkill 的 skills/ 是通用 skill 模板包，每次执行都整体覆盖到这里，不要在 common/ 中修改；
+# - skills/common/：AgentDevWorkSpace 的 skills/ 是通用 skill 模板包，每次执行都整体覆盖到这里，不要在 common/ 中修改；
 #   skills/custom/：项目自己的 skill，从不改动；与 common/ 同名时优先加载 custom/ 中的。两者都随项目提交。
-# - <个人目录>/：specs/ 每个需求一个目录（spec.md、plan.md、tasks.md，从 sdd skill 的 templates/ 复制后填写）；
-#   notes/ 存放 Note。个人目录随项目提交。
-# - config/：配置（notes.json5）；.agent/：env/（Python 虚拟环境、脚本状态、AgentSkill 路径）、profiles/、evals/。
+# - <个人目录>/：specs/ 是个人的自定义约束（constraints.md，从 sdd skill 的 personal-constraints.md 复制，已有时不覆盖）；
+#   feature/、bugfix/、change/ 由 sdd skill 的 new_*.sh 按需创建；notes/ 存放 Note。个人目录随项目提交。
+# - config/：配置（notes.json5）；.agent/：env/（Python 虚拟环境、脚本状态、AgentDevWorkSpace 路径）、profiles/、evals/。
 #   都是本机使用，写入 .gitignore，不提交。
 ws=agent-workspace
 sk="$ws/skills"
@@ -83,14 +84,14 @@ find "$sk/common.tmp" -name __pycache__ -type d -prune -exec rm -rf {} +
 rm -rf "$sk/common"
 mv "$sk/common.tmp" "$sk/common"
 
-# 空目录无法提交，custom/、specs/ 为空时放一个 .gitkeep。
+# 空目录无法提交，custom/ 为空时放一个 .gitkeep。
 [ -n "$(ls -A "$sk/custom")" ] || : > "$sk/custom/.gitkeep"
-[ -n "$(ls -A "$mine/specs")" ] || : > "$mine/specs/.gitkeep"
 
 # 取实际加载的 skill 目录：custom/ 中有同名 skill 时用 custom/，否则用 common/。
 skill_path() {
   if [ -d "$sk/custom/$1" ]; then echo "$sk/custom/$1"; else echo "$sk/common/$1"; fi
 }
+[ -e "$mine/specs/constraints.md" ] || cp "$(skill_path sdd)/personal-constraints.md" "$mine/specs/constraints.md"
 
 # common/ 和 custom/ 中的每个 skill 链接到 .claude/skills/<名称>（Claude Code 按需加载），同名时指向 custom/。
 # 用相对路径链接；已是软链接时更新指向，已有同名的普通文件或目录时不覆盖。.claude/ 可能随项目提交，链接写入 exclude。
@@ -108,7 +109,7 @@ for s in "$sk"/common/*/ "$sk"/custom/*/; do
   ignore "/$link"
 done
 
-# 工作区中的脚本通过这个文件找到 AgentSkill（自动更新时拉取并重新执行 setup.sh）。
+# 工作区中的脚本通过这个文件找到 AgentDevWorkSpace（自动更新时拉取并重新执行 setup.sh）。
 printf '%s\n' "$skill_dir" > "$env_dir/agentskill-path"
 
 # Note 配置：开关、上限、触发 Note 的扫描规则。已有时不覆盖；缺少的键由脚本取 notes skill 中 config.json5 的默认值。

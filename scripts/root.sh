@@ -1,12 +1,12 @@
-# 供 setup.sh、init.sh source，不单独执行。设置 skill_dir（AgentSkill 仓库目录），
+# 供 setup.sh、init.sh source，不单独执行。设置 skill_dir（AgentDevWorkSpace 仓库目录），
 # 提供 resolve_root、resolve_plain_root、find_project_root、git_env、ignore。
-# hook 环境会导出指向 AgentSkill 自身的 GIT_DIR，先清除，避免对项目执行 git 命令时用错仓库。
+# hook 环境会导出指向 AgentDevWorkSpace 自身的 GIT_DIR，先清除，避免对项目执行 git 命令时用错仓库。
 unset GIT_DIR GIT_WORK_TREE
 skill_dir=$(cd "$(dirname "$0")" && git rev-parse --show-toplevel) || exit 1
 skill_dir=$(cd "$skill_dir" && pwd -P)
 
-# 输出项目根目录。按参数顺序取第一个满足条件的目录：是 git 仓库根目录、AgentSkill 位于其下、且不是 AgentSkill 自身。
-# 都不满足时，退回到包含 AgentSkill 的上层 git 仓库。
+# 输出项目根目录。按参数顺序取第一个满足条件的目录：是 git 仓库根目录、AgentDevWorkSpace 位于其下、且不是 AgentDevWorkSpace 自身。
+# 都不满足时，退回到包含 AgentDevWorkSpace 的上层 git 仓库。
 resolve_root() {
   for d in "$@"; do
     [ -n "$d" ] && [ -d "$d" ] || continue
@@ -18,7 +18,7 @@ resolve_root() {
   git -C "$skill_dir/.." rev-parse --show-toplevel 2>/dev/null
 }
 
-# 非 git 工程：显式传入的目录不在任何 git 仓库中、AgentSkill 位于其下且不是 AgentSkill 自身时，输出该目录。
+# 非 git 工程：显式传入的目录不在任何 git 仓库中、AgentDevWorkSpace 位于其下且不是 AgentDevWorkSpace 自身时，输出该目录。
 # 只接受显式参数，不从执行目录推断，避免把 $HOME 之类的上层目录误当成项目根目录。
 resolve_plain_root() {
   d=$1
@@ -30,8 +30,8 @@ resolve_plain_root() {
   echo "$d"
 }
 
-# 输出项目根目录：优先取参数，其次取执行命令的目录，最后取包含 AgentSkill 的上层 git 仓库；非 git 工程须显式传入。
-# 不在任何项目中、且不带参数在 AgentSkill 目录内执行时，输出 AgentSkill 自身（单独使用或开发 AgentSkill）。
+# 输出项目根目录：优先取参数，其次取执行命令的目录，最后取包含 AgentDevWorkSpace 的上层 git 仓库；非 git 工程须显式传入。
+# 不在任何项目中、且不带参数在 AgentDevWorkSpace 目录内执行时，输出 AgentDevWorkSpace 自身（单独使用或开发 AgentDevWorkSpace）。
 find_project_root() {
   r=$(resolve_root "$1" "$PWD") || r=
   [ -n "$r" ] || r=$(resolve_plain_root "$1") || r=
