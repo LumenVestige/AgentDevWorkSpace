@@ -26,7 +26,7 @@
 
 SDD 流程、Note、Git 提交规则和开发知识库检索封装成 skill，在 `agent-workspace/skills/common/` 下；`init.sh` 把每个 skill 链接到 `.claude/skills/`（Claude Code 按需加载，同名时指向 `custom/`）。用到时读取对应的 `SKILL.md`（`custom/` 中有同名 skill 时读 `custom/` 中的）：
 
-- `sdd`（`agent-workspace/skills/common/sdd/SKILL.md`）：用户输入「创建feature:<名称>」「创建bugfix:<名称>」「创建change:<名称>」（或 new_feature / new_bugfix / new_change <名称>）时，按它创建对应的目录；新功能和跨模块的改动，必须先读通用开发约束和个人约束，再按它写 spec / plan / tasks，plan 中逐条做约束检查后才能实现。
+- `sdd`（`agent-workspace/skills/common/sdd/SKILL.md`）：用户输入「创建feature:<名称>」「创建bugfix:<名称>」「创建change:<名称>」（或 new_feature / new_bugfix / new_change <名称>）时，按它创建对应的目录；新功能和跨模块的改动，必须先读通用开发约束和个人约束，再按它写 spec / plan / tasks，spec 中逐条做约束检查后才能实现。
 - `notes`（`agent-workspace/skills/common/notes/SKILL.md`）：改变行为、架构、接口或数据格式的改动，必须写一条 Note；Stop hook 提示有提交尚未记录到 Note 时，按它创建。
 - `knowledge`（`agent-workspace/skills/common/knowledge/SKILL.md`）：搜索或回顾历史开发痕迹（以前做过什么、某个需求或 bug 的方案、为什么这样设计、某笔提交的来龙去脉）时，按它检索，用检索到的文档作为依据回答。
 - `git-commit`（`agent-workspace/skills/common/git-commit/SKILL.md`）：每笔提交信息必须以 `[fix]` / `[feature]` / `[del]` / `[update]` 标签开头；提交前按它编写提交信息。

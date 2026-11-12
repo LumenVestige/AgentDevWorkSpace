@@ -1,6 +1,6 @@
 # 通用开发约束
 
-适用于本项目的所有需求，所有人共同遵守。写 spec / plan 前先读本文件，plan 的「约束检查」一节逐条对照。
+适用于本项目的所有需求，所有人共同遵守。写 spec / plan 前先读本文件，spec 的「约束检查」一节逐条对照。
 修改本文件会改变全项目的约定，需要团队确认后再提交。
 `agent-workspace/skills/common/` 中的本文件每次执行 setup 都会被覆盖：定制时先把 `common/sdd/` 整个复制到 `custom/sdd/`，再修改 custom 中的文件。
 
