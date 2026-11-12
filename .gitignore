@@ -1,4 +1,7 @@
 *.iml
 /.idea
-/.agents/
 __pycache__/
+/agent-workspace/config/
+/agent-workspace/.agent/
+/tests/
+/agent-workspace/

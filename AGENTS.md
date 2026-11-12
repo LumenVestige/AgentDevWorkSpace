@@ -6,39 +6,25 @@
 - 只跑覆盖本次改动的检查，汇报实际跑过的命令。
 - 未经用户要求，不 commit、不 push、不做破坏性操作。
 
-## .agents/ 目录
+## agent-workspace/ 目录
 
-项目根目录下的 `.agents/` 已加入 `.gitignore`，不提交，只存放：
+项目根目录下的 `agent-workspace/` 是 Agent 工作区，由 `scripts/init.sh` 创建，AgentSkill 的文件都放在这里：
 
-- `tmp/`：临时产物；`tmp/venv/` 是 `setup.sh` 创建的 Python 环境，依赖由 `deps.sh` 安装，AgentSkill 的 Python 脚本都用 `git config agentskill.python` 指向的解释器运行；
-- `notes/`：Note 记录；
-- `config/`：配置，`notes.json5` 见下文。
+- `skills/`：Agent 加载的 skill，随项目提交；
+  - `common/`：从 AgentSkill 的 `skills/`（通用 skill 模板包）复制，每次执行 setup 都整体覆盖，不要在这里修改；
+  - `custom/`：项目自己的 skill，setup 从不改动；与 `common/` 同名时优先加载 `custom/` 中的，定制通用 skill 时先把它从 `common/` 复制过来再改；
+- `<个人目录>/`：每人一个，目录名由 `git config user.name` 生成（转小写，空格和标点换成 `-`，例如 `Tony Chen` → `tony-chen`），随项目提交；
+  - `specs/`：每个新功能、bug 修复或变更一个目录（新功能 `NNN-<slug>/`，bug 修复和变更 `NNN-bugfix-<slug>/`、`NNN-change-<slug>/`），内含 `spec.md`、`plan.md`、`tasks.md`（见 `sdd` skill）；
+  - `notes/`：Note 记录（见 `notes` skill）；只改动各人 `notes/` 的提交不会触发新的 Note；
+- `config/`：配置，`notes.json5` 见 `notes` skill；不提交；
+- `.agent/`：本机使用，不提交；
+  - `env/`：`venv/` 是 `setup.sh` 创建的 Python 环境，依赖由 `deps.sh` 安装，skill 中的 Python 脚本都用它运行；另有 Note 校验的状态文件和 AgentSkill 的路径；
+  - `profiles/`、`evals/`：预留。
 
-## Note
+## Skills
 
-改变行为、架构、接口或数据格式的改动，写一条 Note：
+SDD 流程、Note 和 Git 提交规则封装成 skill，在 `agent-workspace/skills/common/` 下；`init.sh` 把每个 skill 链接到 `.claude/skills/`（Claude Code 按需加载，同名时指向 `custom/`）。用到时读取对应的 `SKILL.md`（`custom/` 中有同名 skill 时读 `custom/` 中的）：
 
-- 路径：`.agents/notes/yy-MM-dd-HH-mm-ss-<topic>.md`，平铺在 `notes/` 下，时间取创建时刻（精确到秒），topic 用小写字母加 `-`，例如 `.agents/notes/26-08-25-14-30-05-local-cli-status-restart.md`。
-- 内容：`## Outcome` 写改了什么、现在的行为；`## Verification` 写跑了哪些检查、哪些没覆盖。标题下的 `时间：` 和 Git 提交一节由 `create.py` 填写。
-- 创建：`"$(git config agentskill.python)" "$(git config agentskill.path)/notes/create.py" <topic>`（在项目内任意目录执行）。项目不是 git 仓库时没有项目 git config，改用 `.agents/tmp/venv/bin/python <AgentSkill 目录>/notes/create.py <topic>`。自动填入当前时间和尚未记录到任何 Note 的提交。
-- 每条 Note 独立：后续改动写新 Note，不合并到已有 Note，同一 topic 可重复使用。
-- 校验：每轮对话结束前运行 `"$(git config agentskill.python)" "$(git config agentskill.path)/notes/verify.py"`（Claude Code 和 Codex 已通过 Stop hook 自动执行）。它只判断是否需要写 Note，并按上限删除最早的 Note；提示需要写时按上面的方式创建。运行前先检查自动更新：到期则拉取 AgentSkill（`git pull --ff-only`，工作区有改动时跳过）、重新执行 `setup.sh`，再重新调用 `verify.py` 继续流程。
-- 配置：`.agents/config/notes.json5`（JSON5，每个字段都有注释）
-  - `enabled`：是否开启 Note 校验；
-  - `max_notes`：保留上限，默认 30；
-  - `auto_update`：是否开启自动更新，默认开启；与 `enabled` 相互独立；
-  - `auto_update_interval_hours`：自动更新的检查时长（小时），默认 24，上次更新时间记在 `.agents/tmp/last-update`；
-  - `scan`：触发条件。`commits` 为 true 时存在未记录的提交即触发；`include_merges` 是否计入 merge 提交；`paths` / `exclude_paths` 只统计 / 不统计改动这些路径的提交（git pathspec）。
-
-## Git 提交
-
-每笔提交信息必须以标签开头：`[标签] 简述`
-
-| 标签 | 用途 |
-|---|---|
-| `[fix]` | bug 修复 |
-| `[feature]` | 新增业务功能 |
-| `[del]` | 删除代码、功能或文件 |
-| `[update]` | 代码逻辑更新；不属于以上三类时的兜底标签；多件事合并在一笔提交时也用它 |
-
-一笔提交包含多件事时，不必拆开，统一使用 `[update]` 标签,但是提交message需要列举改动,多个修改用分号(;)字符隔开。
+- `sdd`（`agent-workspace/skills/common/sdd/SKILL.md`）：用户输入「创建feature:<名称>」「创建bugfix:<名称>」「创建change:<名称>」（或 new_feature / new_bugfix / new_change <名称>）时，按它创建对应的目录；新功能和跨模块的改动，必须先读通用开发约束，再按它写 spec / plan / tasks，plan 中逐条做约束检查后才能实现。
+- `notes`（`agent-workspace/skills/common/notes/SKILL.md`）：改变行为、架构、接口或数据格式的改动，必须写一条 Note；Stop hook 提示有提交尚未记录到 Note 时，按它创建。
+- `git-commit`（`agent-workspace/skills/common/git-commit/SKILL.md`）：每笔提交信息必须以 `[fix]` / `[feature]` / `[del]` / `[update]` 标签开头；提交前按它编写提交信息。

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""在项目根目录的 .agents/notes/ 下创建 Note，并填入能从脚本获取的内容，在任意目录执行都可以。
+"""在项目根目录的 agent-workspace/<个人目录>/notes/ 下创建 Note，并填入能从脚本获取的内容，在任意目录执行都可以。
 
-用法："$(git config agentskill.python)" create.py <topic-in-kebab-case>
-文件名：.agents/notes/yy-MM-dd-HH-mm-ss-<topic>.md，平铺在 notes/ 下。
+用法（在项目根目录执行）：agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/create.py <topic-in-kebab-case>
+文件名：agent-workspace/<个人目录>/notes/yy-MM-dd-HH-mm-ss-<topic>.md，平铺在 notes/ 下；个人目录名由 git user.name 生成，同 init.sh。
 
 自动填充：
 - `时间：` 摘要时间戳，取当前时间；
@@ -13,6 +13,8 @@
 import datetime
 import re
 import sys
+
+sys.dont_write_bytecode = True  # 不在工作区副本中生成 __pycache__
 
 from common import HERE, load_config, notes_dir, project_root, unrecorded_commits
 
