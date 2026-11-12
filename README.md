@@ -24,11 +24,11 @@ init.sh（也可单独执行：`sh <子目录>/scripts/init.sh [项目根目录]
 - 在项目根目录创建相对软链接 `AGENTS.md → <子目录>/AGENTS.md` 和 `CLAUDE.md → AGENTS.md`（已有同名文件则跳过）；
 - 按 `git config user.name` 生成个人目录名（转小写，空格和标点换成 `-`；未配置、或与 `skills` / `config` 重名时报错退出），创建工作区 `agent-workspace/`：
   - `skills/common/`：把 AgentDevWorkSpace 的 `skills/`（通用 skill 模板包）整体复制过来，每次执行都覆盖；`skills/custom/`：项目自己的 skill，从不改动，与 common 同名时优先；两者随项目提交；
-  - `<个人目录>/specs/constraints.md`（个人约束，从 sdd skill 的 `personal-constraints.md` 复制，已有则不覆盖）和 `<个人目录>/notes/`（Note 记录），随项目提交；`<个人目录>/feature|bugfix|change/` 由 sdd skill 的创建脚本按需生成；
+  - `<个人目录>/specs/constraints.md`（个人约束，从 sdd skill 的 `personal-constraints.md` 复制，已有则不覆盖，不提交）和 `<个人目录>/notes/`（Note 记录，随项目提交）；`<个人目录>/feature|bugfix|change/` 由 sdd skill 的创建脚本按需生成；
   - `config/`：`notes.json5` 不存在时从 notes skill 的 `config.json5` 复制（Note 开关、上限、自动更新、扫描规则）；
   - `.agent/env/`（Python 虚拟环境、Note 提交基线 `note-base`、AgentDevWorkSpace 路径 `agentskill-path` 等）、`.agent/profiles/`、`.agent/evals/`；
 - 把工作区的每个 skill 软链接到 `.claude/skills/<名称>`（Claude Code 加载；同名时指向 custom），已有同名的非软链接时跳过；
-- 把 `/agent-workspace/config/` 和 `/agent-workspace/.agent/` 写入项目根目录的 `.gitignore`（已有则跳过）；AgentDevWorkSpace 目录、`AGENTS.md` / `CLAUDE.md` 软链接和 `.claude/skills/` 下的 skill 链接写入 `.git/info/exclude`。
+- 把 `/agent-workspace/config/`、`/agent-workspace/.agent/` 和 `/agent-workspace/*/specs/`（所有个人目录的 specs/）写入项目根目录的 `.gitignore`（已有则跳过）；AgentDevWorkSpace 目录、`AGENTS.md` / `CLAUDE.md` 软链接和 `.claude/skills/` 下的 skill 链接写入 `.git/info/exclude`。
 
 之后 setup.sh 继续：
 

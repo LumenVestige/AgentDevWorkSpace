@@ -13,8 +13,8 @@
 - `skills/`：Agent 加载的 skill，随项目提交；
   - `common/`：从 AgentDevWorkSpace 的 `skills/`（通用 skill 模板包）复制，每次执行 setup 都整体覆盖，不要在这里修改；
   - `custom/`：项目自己的 skill，setup 从不改动；与 `common/` 同名时优先加载 `custom/` 中的，定制通用 skill 时先把它从 `common/` 复制过来再改；
-- `<个人目录>/`：每人一个，目录名由 `git config user.name` 生成（转小写，空格和标点换成 `-`，例如 `Tony Chen` → `tony-chen`），随项目提交；
-  - `specs/`：个人的自定义约束 `constraints.md`，补充通用开发约束（见 `sdd` skill）；
+- `<个人目录>/`：每人一个，目录名由 `git config user.name` 生成（转小写，空格和标点换成 `-`，例如 `Tony Chen` → `tony-chen`），除 `specs/` 外随项目提交；
+  - `specs/`：个人的自定义约束 `constraints.md`，补充通用开发约束（见 `sdd` skill）；setup 时写入 `.gitignore`，不提交；
   - `feature/`、`bugfix/`、`change/`：每个新功能、bug 修复、变更一个目录 `NNN-<slug>/`，内含 `spec.md`、`plan.md`、`tasks.md`（见 `sdd` skill）；
   - `notes/`：Note 记录（见 `notes` skill）；只改动各人 `notes/` 的提交不会触发新的 Note；
 - `config/`：配置，`notes.json5` 见 `notes` skill；不提交；
