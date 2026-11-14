@@ -20,6 +20,7 @@
 - `config/`：配置，`notes.json5` 见 `notes` skill；不提交；
 - `.agent/`：本机使用，不提交；
   - `env/`：`venv/` 是 `setup.sh` 创建的 Python 环境，依赖由 `deps.sh` 安装，skill 中的 Python 脚本都用它运行；另有 Note 校验的状态文件和 AgentDevWorkSpace 的路径；
+  - `tmp/`：Agent 的临时文件（中间结果、一次性脚本、抓取的日志和截图等），按任务建子目录 `tmp/<主题>/`；不要在项目根目录或其他位置新建 `.agents/`、`tmp/` 之类的临时目录；已写入 `.gitignore`，不提交，需要留作证据的内容整理后放进对应需求目录；
   - `profiles/`、`evals/`：预留。
 
 ## Skills
