@@ -36,6 +36,7 @@ init.sh（也可单独执行：`sh <子目录>/scripts/init.sh [项目根目录]
 - 执行 `scripts/deps.sh`，用该虚拟环境的 pip 安装依赖（清单写在 deps.sh 中，已满足时跳过）；
 - 执行 `scripts/check.sh`，检查虚拟环境与依赖是否安装成功，失败时中止；
 - 把工作区的 `agent-workspace/skills/common/notes/verify.py` 注册为 Claude Code 的 Stop hook（写入 `.claude/settings.local.json`）和 Codex 的 Stop hook（写入 `.codex/hooks.json`）；每轮对话结束时检查未记录到 Note 的提交和 Note 上限；运行前若距上次更新超过 `auto_update_interval_hours`（默认 24 小时），先拉取 AgentDevWorkSpace（`git pull --ff-only`，工作区有改动时跳过）并重新执行 setup.sh（同时用新的模板包覆盖 `skills/common/`）。Codex 的项目级 hook 只在项目被信任时加载，未信任时 setup.sh 会提示在 `~/.codex/config.toml` 中加入 `[projects."<项目根目录>"]` 和 `trust_level = "trusted"`；此外 Codex 对 hook 本身还有一道信任，首次启动（以及 hook 命令变更后）会要求确认，选择信任后才会执行；
+- 把工作区 sdd skill 的 `check_layout.py` 也注册为 Claude Code 和 Codex 的 Stop hook：当前用户个人目录的需求目录中新增的文件不在根目录白名单（`spec.md`、`plan.md`、`tasks.md`、`summary.md`）内、也不在 `NN-<主题>/` 子目录中时，阻止结束并列出清单（同一轮只阻止一次）；已提交的旧文件不追溯，手动加 `--all` 检查全部；同一事件下各脚本的 hook 分别去重，重复执行 setup 不会重复添加；
 - 把工作区 sdd skill 的 `welcome.py` 注册为 Claude Code 和 Codex 的 SessionStart hook（matcher `startup|clear`）：新对话和 `/clear` 时向用户展示 SDD 快捷命令（`welcome.md`）；
 - 为当前项目安装 `commit-msg` hook（转发到 `agent-workspace/skills/common/git-commit/commit-msg`），检查 `[fix]` / `[feature]` / `[del]` / `[update]` 标签。
 
@@ -59,6 +60,7 @@ skills/sdd/personal-constraints.md  个人约束模板（复制到 <个人目录
 skills/sdd/new.sh               创建 <个人目录>/<feature|bugfix|change>/NNN-<slug>/ 并复制该类型的模板
 skills/sdd/new_feature.sh, new_bugfix.sh, new_change.sh  快捷命令「创建feature/bugfix/change:<名称>」对应的入口
 skills/sdd/welcome.md, welcome.py  SessionStart hook：新对话时展示 SDD 快捷命令
+skills/sdd/check_layout.py      Stop hook：检查需求目录中新增的文件是否已归类（根目录白名单 + NN-<主题>/ 子目录）
 skills/sdd/templates/<类型>/    SDD 模板：spec.md、plan.md、tasks.md，按 feature / bugfix / change 分开
 skills/knowledge/SKILL.md       knowledge skill：开发知识库里有什么（SDD 产物、Note、约束、提交），如何检索和追溯
 skills/knowledge/search.sh      按关键词检索所有人的 feature / bugfix / change、Note、约束和提交信息

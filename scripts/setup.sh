@@ -61,7 +61,8 @@ sh "$skill_dir/scripts/check.sh" "$py"
 date +%s > agent-workspace/.agent/env/last-update
 
 # 注册 Claude Code（.claude/settings.local.json）和 Codex（.codex/hooks.json）的 hook，两者的事件结构相同，共用同一条命令：
-# - Stop：每轮对话结束时执行 notes skill 的 verify.py，退出码 2 + stderr 表示阻止结束并把 stderr 交回 Agent；
+# - Stop：每轮对话结束时执行 notes skill 的 verify.py 和 sdd skill 的 check_layout.py（需求目录中新增的文件是否已归类），
+#   退出码 2 + stderr 表示阻止结束并把 stderr 交回 Agent；
 # - SessionStart（startup、clear，即新对话和 /clear）：执行 sdd skill 的 welcome.py，展示 SDD 快捷命令的欢迎语。
 # 执行工作区中的脚本，custom/ 中有同名 skill 的该脚本时优先。都是项目本地配置，不提交；同一事件已注册时不重复添加。
 # git 工程按仓库根目录定位，项目移动后仍有效；非 git 工程命令中直接写项目根目录的绝对路径。
@@ -88,11 +89,12 @@ def command(skill, script):
             f'[ -f "$f" ] && exec {ws}/.agent/env/venv/bin/python "$f"; exit 0  {MARK}')
 
 
-def register(path, event, hook, matcher=None):
-    """把 hook 写进配置文件的 event 下；该事件已有带标记的命令时不重复添加。"""
+def register(path, event, hook, script, matcher=None):
+    """把 hook 写进配置文件的 event 下；该事件已有执行同一脚本（<skill>/<脚本>）的带标记命令时不重复添加，
+    同一事件可以注册多个不同脚本的 hook。"""
     cfg = json.loads(path.read_text() or "{}") if path.exists() else {}
     entries = cfg.setdefault("hooks", {}).setdefault(event, [])
-    if any(MARK in h.get("command", "") for e in entries for h in e.get("hooks", [])):
+    if any(MARK in c and f"/{script}" in c for e in entries for c in (h.get("command", "") for h in e.get("hooks", []))):
         return
     entries.append({**({"matcher": matcher} if matcher else {}), "hooks": [hook]})
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -100,12 +102,15 @@ def register(path, event, hook, matcher=None):
 
 
 verify = command("notes", "verify.py")
+layout = command("sdd", "check_layout.py")
 welcome = command("sdd", "welcome.py")
 claude, codex = Path(".claude/settings.local.json"), Path(".codex/hooks.json")
-register(claude, "Stop", {"type": "command", "command": verify})
-register(codex, "Stop", {"type": "command", "command": verify, "statusMessage": "检查 Note"})
-register(claude, "SessionStart", {"type": "command", "command": welcome}, matcher="startup|clear")
-register(codex, "SessionStart", {"type": "command", "command": welcome}, matcher="startup|clear")
+register(claude, "Stop", {"type": "command", "command": verify}, "notes/verify.py")
+register(codex, "Stop", {"type": "command", "command": verify, "statusMessage": "检查 Note"}, "notes/verify.py")
+register(claude, "Stop", {"type": "command", "command": layout}, "sdd/check_layout.py")
+register(codex, "Stop", {"type": "command", "command": layout, "statusMessage": "检查需求目录归类"}, "sdd/check_layout.py")
+register(claude, "SessionStart", {"type": "command", "command": welcome}, "sdd/welcome.py", matcher="startup|clear")
+register(codex, "SessionStart", {"type": "command", "command": welcome}, "sdd/welcome.py", matcher="startup|clear")
 
 # Codex 的项目级 hook 只在项目被信任时加载，这里只提示，不改动用户的全局配置。
 # Codex 对 hook 本身还有一道信任（按命令的哈希），首次启动时在界面中确认，不在这里代替用户决定。
