@@ -15,7 +15,7 @@ cd <项目根目录>
 agentdev init  # 自动初始化并检查环境，无需再执行 check
 ```
 
-fish 使用 `source AgentDevWorkSpace/install.fish`。普通 `sh setup.sh` 无法修改父终端 PATH，会输出本 shell 的激活命令；source 入口在当前会话自动生效。`--no-path` 只跳过持久 PATH 配置，显式 source 仍激活当前会话。
+fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 `source .../env.fish` 激活命令。普通 `sh setup.sh` 无法修改父终端 PATH，会输出本 shell 的激活命令；source 入口在当前会话自动生效。`--no-path` 只跳过持久 PATH 配置，显式 source 仍激活当前会话。
 
 当前仅支持 macOS 和 Linux。可在源码目录直接运行 `./agentdev` 或 `./adev`；setup 只负责全局安装，项目接入用 `agentdev init`，完成后自动检查环境。
 
@@ -137,7 +137,7 @@ sh publish/publish.sh "[update] 发布版本 1.0.0" 1.0.0
 ```
 AGENTS.md                  规则
 agentdev / adev             macOS/Linux 源码命令入口，默认展示帮助
-setup.sh / install.fish     安装与当前会话激活入口
+setup.sh                   安装与 bash/zsh 当前会话激活入口
 update.sh                  独立更新入口
 scripts/agentdev.py         命令解析、全局安装、更新、版本与 PATH 注册
 scripts/workspace.py        工作区初始化、只读检查及平台链接/复制

@@ -181,7 +181,7 @@ def install(source, home, no_path=False, repo=None):
             shutil.copytree(source / name, staged / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         (staged / "publish").mkdir()
         (staged / "publish/version").write_text(version_text(read_version(source)) + "\n", encoding="utf-8")
-        for name in ("AGENTS.md", "README.md", "agentdev", "adev", "setup.sh", "install.fish"):
+        for name in ("AGENTS.md", "README.md", "agentdev", "adev", "setup.sh"):
             shutil.copy2(source / name, staged / name)
         if (home / "app").exists():
             (home / "app").rename(previous)
