@@ -15,11 +15,13 @@ cd <项目根目录>
 agentdev init  # 自动初始化并检查环境，无需再执行 check
 ```
 
-fish 使用 `source AgentDevWorkSpace/setup.fish`。普通 `sh setup.sh` 无法修改父终端 PATH，会输出本 shell 的激活命令；source 入口在当前会话自动生效。`--no-path` 只跳过持久 PATH 配置，显式 source 仍激活当前会话。
+fish 使用 `source AgentDevWorkSpace/install.fish`。普通 `sh setup.sh` 无法修改父终端 PATH，会输出本 shell 的激活命令；source 入口在当前会话自动生效。`--no-path` 只跳过持久 PATH 配置，显式 source 仍激活当前会话。
 
-当前仅支持 macOS 和 Linux。可在源码目录直接运行 `./agentdev`；setup 只负责全局安装，项目接入用 `agentdev init`，完成后自动检查环境。
+当前仅支持 macOS 和 Linux。可在源码目录直接运行 `./agentdev` 或 `./adev`；setup 只负责全局安装，项目接入用 `agentdev init`，完成后自动检查环境。
 
 ## agentdev 命令
+
+`adev` 是 `agentdev` 的等价短命令，支持相同的子命令、参数与退出码，例如 `adev init`、`adev --i`。已有安装重新执行 `agentdev setup` 后即可使用。
 
 直接输入 `agentdev` 默认显示帮助，命令与别名统一如下（例如 `agentdev init` 与 `agentdev --i` 等价）：
 
@@ -42,12 +44,12 @@ fish 使用 `source AgentDevWorkSpace/setup.fish`。普通 `sh setup.sh` 无法�
 ~/.agent-dev-workspace/
 ├── app/             受管理的程序和 skill 模板（含 publish/version）
 ├── venv/            共享 Python 环境，使用 bin/python
-├── bin/             agentdev 命令入口
+├── bin/             agentdev / adev 命令入口
 ├── env              bash/zsh/sh 激活文件（另有 env.fish）
 └── install.json     更新使用的源仓库与 PATH 配置状态
 ```
 
-setup 在 macOS/Linux 注册当前用户的 shell PATH（zsh 的 `.zshrc`，bash 的 `.bashrc`/登录配置，fish 的 config.fish）；不写系统目录或安装系统级依赖。可用 `agentdev setup --no-path` 跳过 PATH 修改，之后通过完整路径调用 `bin/agentdev` 。`AGENTDEV_HOME` 可指定安装目录；测试使用仓库内隔离目录，不修改真实主目录。
+setup 在 macOS/Linux 注册当前用户的 shell PATH（zsh 的 `.zshrc`，bash 的 `.bashrc`/登录配置，fish 的 config.fish）；不写系统目录或安装系统级依赖。可用 `agentdev setup --no-path` 跳过 PATH 修改，之后通过完整路径调用 `bin/agentdev` 或 `bin/adev` 。`AGENTDEV_HOME` 可指定安装目录；测试使用仓库内隔离目录，不修改真实主目录。
 
 setup 可从当前源码安装，包含尚未提交的源码改动；更新根据 `install.json` 记录的 Git 仓库和远端版本，下载到临时目录，验证版本后替换 `app/`，失败保留原程序和可重试状态。安装与更新使用全局互斥锁。保留项目的配置、custom skills、个人约束和 Note；旧项目本地 venv 不删除。
 
@@ -134,8 +136,8 @@ sh publish/publish.sh "[update] 发布版本 1.0.0" 1.0.0
 
 ```
 AGENTS.md                  规则
-agentdev                   macOS/Linux 源码命令入口，默认展示帮助
-setup.sh / setup.fish       安装与当前会话激活入口
+agentdev / adev             macOS/Linux 源码命令入口，默认展示帮助
+setup.sh / install.fish     安装与当前会话激活入口
 update.sh                  独立更新入口
 scripts/agentdev.py         命令解析、全局安装、更新、版本与 PATH 注册
 scripts/workspace.py        工作区初始化、只读检查及平台链接/复制

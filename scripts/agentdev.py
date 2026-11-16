@@ -83,9 +83,10 @@ def write_launchers(home):
     directory = home / "bin"
     directory.mkdir(exist_ok=True)
     py, entry = str(python_exe(home)), str(home / "app/scripts/agentdev.py")
-    unix = directory / "agentdev"
-    unix.write_text(f'#!/bin/sh\nexec {shlex.quote(py)} {shlex.quote(entry)} "$@"\n', encoding="utf-8")
-    unix.chmod(0o755)
+    for name in ("agentdev", "adev"):
+        unix = directory / name
+        unix.write_text(f'#!/bin/sh\nexec {shlex.quote(py)} {shlex.quote(entry)} "$@"\n', encoding="utf-8")
+        unix.chmod(0o755)
     env_file = shlex.quote(str(home / "env"))
     command = f'{shlex.quote(py)} -B {shlex.quote(entry)}'
     (home / "env").write_text(
@@ -93,7 +94,8 @@ def write_launchers(home):
         'agentdev() {\n'
         f'  if {command} "$@"; then\n'
         f'    case "${{1-}}" in setup|-setup|--s) . {env_file} ;; esac\n'
-        '  else\n    return $?\n  fi\n}\n', encoding="utf-8")
+        '  else\n    return $?\n  fi\n}\n'
+        'adev() { agentdev "$@"; }\n', encoding="utf-8")
     fish_quote = lambda text: "'" + text.replace("\\", "\\\\").replace("'", "\\'") + "'"
     (home / "env.fish").write_text(
         f'if not contains -- {fish_quote(str(directory))} $PATH\n'
@@ -179,7 +181,7 @@ def install(source, home, no_path=False, repo=None):
             shutil.copytree(source / name, staged / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
         (staged / "publish").mkdir()
         (staged / "publish/version").write_text(version_text(read_version(source)) + "\n", encoding="utf-8")
-        for name in ("AGENTS.md", "README.md", "agentdev", "setup.sh", "setup.fish"):
+        for name in ("AGENTS.md", "README.md", "agentdev", "adev", "setup.sh", "install.fish"):
             shutil.copy2(source / name, staged / name)
         if (home / "app").exists():
             (home / "app").rename(previous)
@@ -243,7 +245,7 @@ def main(argv=None):
     argv = [ALIASES.get(argv[0], argv[0]), *argv[1:]] if argv else ["help"]
     parser = argparse.ArgumentParser(prog="agentdev", description="AgentDevWorkSpace 全局安装与工作区管理")
     parser.epilog = ("别名：help / --h；setup / --s；init / --i；update / --u；version / --v；check / --c。"
-                     "不传命令时展示帮助；工作区目录名为 agent-workspace/。")
+                     "adev 与 agentdev 等价；不传命令时展示帮助；工作区目录名为 agent-workspace/。")
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("help", help="展示各个命令")
     setup = commands.add_parser("setup", help="全局安装 / 重新安装")

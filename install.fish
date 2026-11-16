@@ -1,4 +1,4 @@
-# fish: source setup.fish
+# fish: source install.fish
 set -l agentdev_source (dirname (status filename))
 if sh "$agentdev_source/setup.sh" $argv
     set -l agentdev_install_home $AGENTDEV_HOME
