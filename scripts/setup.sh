@@ -60,13 +60,14 @@ sh "$skill_dir/scripts/deps.sh" "$py"
 # 检查虚拟环境与依赖是否安装成功，失败时中止。
 sh "$skill_dir/scripts/check.sh" "$py"
 
-# verify.py 自动更新的时间戳：刚初始化完，从现在开始计时。
+# 自动更新（notes skill 的 update.py）上次版本检查的时间戳：刚初始化完，从现在开始计时。
 date +%s > agent-workspace/.agent/env/last-update
 
 # 注册 Claude Code（.claude/settings.local.json）和 Codex（.codex/hooks.json）的 hook，两者的事件结构相同，共用同一条命令：
 # - Stop：每轮对话结束时执行 notes skill 的 verify.py 和 sdd skill 的 check_layout.py（需求目录中新增的文件是否已归类），
 #   退出码 2 + stderr 表示阻止结束并把 stderr 交回 Agent；
-# - SessionStart（startup、clear，即新对话和 /clear）：执行 sdd skill 的 welcome.py，展示 SDD 快捷命令的欢迎语。
+# - SessionStart（startup、clear，即新对话和 /clear）：执行 sdd skill 的 welcome.py，展示 SDD 快捷命令的欢迎语；
+#   执行 notes skill 的 update.py，在后台检查 AgentDevWorkSpace 的版本，有新版本时拉取，LLM 任务结束后再执行 setup.sh。
 # 执行工作区中的脚本，custom/ 中有同名 skill 的该脚本时优先。都是项目本地配置，不提交；同一事件已注册时不重复添加。
 # git 工程按仓库根目录定位，项目移动后仍有效；非 git 工程命令中直接写项目根目录的绝对路径。
 ignore /.claude/settings.local.json
@@ -107,6 +108,7 @@ def register(path, event, hook, script, matcher=None):
 verify = command("notes", "verify.py")
 layout = command("sdd", "check_layout.py")
 welcome = command("sdd", "welcome.py")
+updater = command("notes", "update.py")
 claude, codex = Path(".claude/settings.local.json"), Path(".codex/hooks.json")
 register(claude, "Stop", {"type": "command", "command": verify}, "notes/verify.py")
 register(codex, "Stop", {"type": "command", "command": verify, "statusMessage": "检查 Note"}, "notes/verify.py")
@@ -114,6 +116,8 @@ register(claude, "Stop", {"type": "command", "command": layout}, "sdd/check_layo
 register(codex, "Stop", {"type": "command", "command": layout, "statusMessage": "检查需求目录归类"}, "sdd/check_layout.py")
 register(claude, "SessionStart", {"type": "command", "command": welcome}, "sdd/welcome.py", matcher="startup|clear")
 register(codex, "SessionStart", {"type": "command", "command": welcome}, "sdd/welcome.py", matcher="startup|clear")
+register(claude, "SessionStart", {"type": "command", "command": updater}, "notes/update.py", matcher="startup|clear")
+register(codex, "SessionStart", {"type": "command", "command": updater}, "notes/update.py", matcher="startup|clear")
 
 # Codex 的项目级 hook 只在项目被信任时加载，这里只提示，不改动用户的全局配置。
 # Codex 对 hook 本身还有一道信任（按命令的哈希），首次启动时在界面中确认，不在这里代替用户决定。
