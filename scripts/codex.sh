@@ -1,5 +1,7 @@
 #!/bin/sh
-# Codex 的交互启动入口：输入首条消息前打印欢迎语，再以保留终端内容的模式启动原生 CLI。
+# Codex 的交互启动入口：输入首条消息前打印 AgentDevWorkSpace 版本号和欢迎语，并在后台触发一次自动更新检查
+#（notes skill 的 update.py，立即返回；Codex 未信任项目时项目级 SessionStart hook 不会加载，这里保证展示欢迎语时也会检查），
+# 再以保留终端内容的模式启动原生 CLI。
 # shell 函数可转发到本脚本；本脚本不安装全局命令，也不更改原生 CLI。
 set -e
 
@@ -38,9 +40,18 @@ if [ -n "$interactive" ] && [ -t 1 ] && [ -d "$launch_dir" ]; then
   welcome="$launch_root/agent-workspace/skills/custom/sdd/welcome.md"
   [ -f "$welcome" ] || welcome="$launch_root/agent-workspace/skills/common/sdd/welcome.md"
   if [ -r "$welcome" ] && [ -s "$welcome" ]; then
+    ws=$launch_root/agent-workspace
+    skill=$(cat "$ws/.agent/env/agentskill-path" 2>/dev/null || :)
+    version=$(tr -d '[:space:]' < "$skill/publish/version" 2>/dev/null || :)
     printf '\n'
+    case "$version" in ''|*[!0-9]*) ;; *) printf 'AgentDevWorkSpace 版本：%s\n\n' "$version" ;; esac
     cat "$welcome"
     printf '\n\n'
+    updater="$ws/skills/custom/notes/update.py"
+    [ -f "$updater" ] || updater="$ws/skills/common/notes/update.py"
+    if [ -f "$updater" ] && [ -x "$ws/.agent/env/venv/bin/python" ]; then
+      "$ws/.agent/env/venv/bin/python" "$updater" </dev/null >/dev/null 2>&1 || :
+    fi
     exec codex --no-alt-screen "$@"
   fi
 fi

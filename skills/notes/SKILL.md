@@ -60,7 +60,7 @@ agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/v
 
 `update.py` 按版本号判断 AgentDevWorkSpace 是否需要更新；hook 只启动后台进程、立即返回，需要更新时后台进程立即拉取并执行 setup.sh：
 
-- 触发：每次会话开始（SessionStart hook，startup / clear，与欢迎语同时）都检查；每轮结束时（verify.py）距上次检查超过 `auto_update_interval_hours` 才检查；
+- 触发：每次会话开始（SessionStart hook，startup / clear，与欢迎语同时）和 Codex 启动入口 `scripts/codex.sh` 打印欢迎语时都检查；每轮结束时（verify.py）距上次检查超过 `auto_update_interval_hours` 才检查；
 - 更新：请求 `update_url`（versions 库的 `AgentDevWorkSpace/version`），与 AgentDevWorkSpace 的 `publish/version` 比较；本地低于远端时 `git pull --ff-only`（AgentDevWorkSpace 工作区有改动时跳过），拉取到新版本后立即执行 setup.sh（同时用新的模板包覆盖 `skills/common/`）；
 - 失败重试：执行 setup.sh 前写入 `agent-workspace/.agent/env/update-ready`，成功后删除；失败时保留，下次触发时先补执行 setup.sh；
 - 后台进程降低优先级（nice），同一时间只运行一个（`update.lock`）；过程和失败原因写入 `agent-workspace/.agent/env/update.log`，失败不影响 hook。
