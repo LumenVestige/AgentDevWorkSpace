@@ -60,7 +60,7 @@ setup 可从当前源码安装，包含尚未提交的源码改动；更新根�
 - `skills/common/` 每次从全局模板整体刷新；`skills/custom/` 保留，同名时优先。
 - 按统一命名规则创建个人目录、`specs/constraints.md` 和 `notes/`，保留已有内容；旧版平铺 Note 迁移到按类型、日期归档的目录，目标已有时不覆盖。
 - `config/config.json5` 不存在时从模板复制；`.agent/env/python-path` 和 `agentskill-path` 记录共享解释器及全局程序位置。
-- 保留项目原有 AGENTS 内容，在标记块中同步通用规则；链接 `CLAUDE.md` 和 `.claude/skills/`；链接不可用时复制，并保留复制后被用户修改的文件。
+- 保留项目原有 `AGENTS.md` 内容，标记块只引用 `agent-workspace/AGENTS.md`，通用规则同步到该独立文件，不再追加规则全文；再次初始化会替换旧的受管明文块，并迁移未被用户修改的受管入口。用户自建符号链接和已修改的受管副本保持不变。链接 `CLAUDE.md` 和 `.claude/skills/`；链接不可用时复制，并保留复制后被用户修改的文件。
 - 注册 Claude Code 和 Codex 的 Stop / SessionStart hook，保留其他 hook；由共享 Python 启动器选择 custom 优先的脚本。Codex 中仍需由用户信任项目及 hook。
 - Git 项目安装提交标签校验 hook（已有其他 hook 时保留）；非 Git 项目跳过。SDD 快捷脚本直接使用本机 POSIX shell。
 - `.gitignore` 忽略工作区配置、`.agent/` 和个人约束；工具生成的客户端配置和链接不纳入 Git。

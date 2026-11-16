@@ -130,6 +130,35 @@ def link_or_copy(target, source, managed):
         managed[key] = fingerprint(target)
 
 
+def sync_agent_rules(project, source, managed):
+    """入口只保留文件引用；旧的受管明文块和未修改入口可迁移。"""
+    agents = project / "AGENTS.md"
+    rules = project / "agent-workspace/AGENTS.md"
+    write_if_changed(rules, (source / "AGENTS.md").read_text(encoding="utf-8"))
+    key = str(agents)
+    generated = key in managed or not (agents.exists() or agents.is_symlink())
+    text = ""
+    if agents.is_symlink():
+        if managed.get(key) != "symlink":
+            print(f"保留已有链接：{agents}")
+            return
+        # 只替换受管理的入口，不写入旧链接的目标（可能是安装目录）。
+        agents.unlink()
+    elif agents.exists():
+        if key in managed:
+            if managed[key] != fingerprint(agents):
+                print(f"保留已有文件或目录：{agents}")
+                return
+        else:
+            text = agents.read_text(encoding="utf-8")
+    text = re.sub(r"<!-- agentskill:begin[^\n]*-->.*?" + re.escape(MARK_END), "", text, flags=re.S).rstrip()
+    reference = "请先阅读并遵守 [AgentDevWorkSpace 通用规则](agent-workspace/AGENTS.md)（路径相对于项目根目录）。"
+    block = MARK_BEGIN + "\n\n" + reference + "\n" + MARK_END + "\n"
+    write_if_changed(agents, (text + "\n\n" if text else "") + block)
+    if generated:
+        managed[key] = fingerprint(agents)
+
+
 def load_json(path):
     value = json.loads(path.read_text(encoding="utf-8") or "{}") if path.exists() else {}
     if not isinstance(value, dict):
@@ -258,13 +287,9 @@ def initialize(source, home, project):
     (env / "last-update").write_text(f"{int(time.time())}\n", encoding="utf-8")
     managed = load_json(env / "managed-links.json")
     agents = project / "AGENTS.md"
-    # 主仓库自己的规则是模板源，不能再追加模板或替换为安装目录链接。
+    # 主仓库自己的规则是模板源，不写入受管引用。
     if not source_repository:
-        if agents.is_file() and not agents.is_symlink() and str(agents) not in managed:
-            text = re.sub(r"<!-- agentskill:begin[^\n]*-->.*?" + re.escape(MARK_END), "", agents.read_text(encoding="utf-8"), flags=re.S).rstrip()
-            write_if_changed(agents, text + "\n\n" + MARK_BEGIN + "\n\n" + (source / "AGENTS.md").read_text(encoding="utf-8").rstrip() + "\n" + MARK_END + "\n")
-        else:
-            link_or_copy(agents, source / "AGENTS.md", managed)
+        sync_agent_rules(project, source, managed)
     link_or_copy(project / "CLAUDE.md", agents, managed)
     for name in sorted({path.name for directory in (common, ws / "skills/custom") for path in directory.iterdir() if path.is_dir()}):
         target = ws / "skills/custom" / name

@@ -1,4 +1,4 @@
-"""Source-repository update protections, isolated from real installations and profiles."""
+"""Workspace rule references and source protections, isolated from real installations."""
 import contextlib
 import io
 import json
@@ -103,9 +103,110 @@ class SourceWorkspaceTests(unittest.TestCase):
     def test_update_regular_project_still_updates_managed_files(self):
         project = self.project("AgentDevWorkSpace", source=False)
         self.update(project, self.version)
-        self.assertIn(workspace.MARK_BEGIN, (project / "AGENTS.md").read_text())
+        self.assert_agent_reference(project)
         self.assertIn("/agent-workspace/*/specs/", (project / ".gitignore").read_text())
         self.assert_workspace_refreshed(project)
+
+    def assert_agent_reference(self, project):
+        agents = project / "AGENTS.md"
+        text = agents.read_text()
+        self.assertFalse(agents.is_symlink())
+        self.assertEqual(text.count(workspace.MARK_BEGIN), 1)
+        self.assertEqual(text.count("(agent-workspace/AGENTS.md)"), 1)
+        self.assertNotIn("## 工作方式", text)
+        self.assertEqual((project / "agent-workspace/AGENTS.md").read_bytes(),
+                         (self.source / "AGENTS.md").read_bytes())
+        self.assertEqual((project / "CLAUDE.md").read_text(), text)
+
+    def test_init_references_rules_and_refreshes_only_referenced_file(self):
+        project = self.project(source=False)
+        workspace.initialize(self.source, self.home, project)
+        self.assert_agent_reference(project)
+        agents = project / "AGENTS.md"
+        before = agents.read_bytes(), agents.stat().st_mtime_ns
+        self.assertIn("# Local rules\nKeep these exact bytes.", agents.read_text())
+        with (self.source / "AGENTS.md").open("a") as rules:
+            rules.write("\nUpdated shared rules\n")
+        workspace.initialize(self.source, self.home, project)
+        self.assert_agent_reference(project)
+        self.assertEqual((agents.read_bytes(), agents.stat().st_mtime_ns), before)
+
+    def test_init_replaces_old_inline_blocks_preserving_surrounding_rules(self):
+        project = self.project(source=False)
+        agents = project / "AGENTS.md"
+        block = (workspace.MARK_BEGIN + "\n\n" +
+                 (self.source / "AGENTS.md").read_text() + workspace.MARK_END)
+        agents.write_text("# Project rules\n\n" + block + "\n\nKeep this footer.\n\n" + block + "\n")
+        workspace.initialize(self.source, self.home, project)
+        self.assert_agent_reference(project)
+        self.assertIn("# Project rules", agents.read_text())
+        self.assertIn("Keep this footer.", agents.read_text())
+        before = agents.read_bytes()
+        workspace.initialize(self.source, self.home, project)
+        self.assertEqual(agents.read_bytes(), before)
+
+    def test_init_creates_reference_when_agents_is_missing(self):
+        project = self.project(source=False)
+        (project / "AGENTS.md").unlink()
+        workspace.initialize(self.source, self.home, project)
+        self.assert_agent_reference(project)
+
+    def test_init_migrates_old_managed_agents_links_and_copies(self):
+        for kind in ("symlink", "copy"):
+            with self.subTest(kind=kind):
+                project = self.project(kind, source=False)
+                agents = project / "AGENTS.md"
+                agents.unlink()
+                if kind == "symlink":
+                    agents.symlink_to(self.source / "AGENTS.md")
+                    state = "symlink"
+                else:
+                    shutil.copy2(self.source / "AGENTS.md", agents)
+                    state = workspace.fingerprint(agents)
+                env = project / "agent-workspace/.agent/env"
+                env.mkdir(parents=True)
+                (env / "managed-links.json").write_text(json.dumps({str(agents): state}))
+                original = (self.source / "AGENTS.md").read_bytes()
+                workspace.initialize(self.source, self.home, project)
+                self.assert_agent_reference(project)
+                self.assertEqual((self.source / "AGENTS.md").read_bytes(), original)
+
+    def test_init_preserves_user_modified_managed_agents_copy(self):
+        project = self.project(source=False)
+        agents = project / "AGENTS.md"
+        shutil.copy2(self.source / "AGENTS.md", agents)
+        state = workspace.fingerprint(agents)
+        agents.write_text(agents.read_text() + "\nUser customizations\n")
+        env = project / "agent-workspace/.agent/env"
+        env.mkdir(parents=True)
+        (env / "managed-links.json").write_text(json.dumps({str(agents): state}))
+        before = agents.read_bytes(), agents.stat().st_mtime_ns
+        workspace.initialize(self.source, self.home, project)
+        self.assertEqual((agents.read_bytes(), agents.stat().st_mtime_ns), before)
+
+    def test_init_preserves_unmanaged_agents_symlink(self):
+        project = self.project(source=False)
+        agents = project / "AGENTS.md"
+        target = self.base / "user-agent-rules.md"
+        agents.rename(target)
+        agents.symlink_to(target)
+        before = target.read_bytes(), target.stat().st_mtime_ns
+        workspace.initialize(self.source, self.home, project)
+        self.assertTrue(agents.is_symlink())
+        self.assertEqual(agents.resolve(), target)
+        self.assertEqual((target.read_bytes(), target.stat().st_mtime_ns), before)
+
+    def test_init_reference_works_without_symlink_support(self):
+        project = self.project(source=False)
+        (project / "AGENTS.md").unlink()
+        # 本测试只模拟规则/skill 链接的复制回退，避开共享运行时兼容链接。
+        (project / "agent-workspace/.agent/env/venv").mkdir(parents=True)
+        with mock.patch.object(Path, "symlink_to", side_effect=OSError("no symlinks")):
+            workspace.initialize(self.source, self.home, project)
+            self.assert_agent_reference(project)
+            workspace.initialize(self.source, self.home, project)
+            self.assert_agent_reference(project)
+        self.assertFalse((project / "CLAUDE.md").is_symlink())
 
     def test_init_preserves_source_symlinks_and_their_targets(self):
         project = self.project()
