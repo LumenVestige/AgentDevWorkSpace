@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from support import isolated_env
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +22,7 @@ class SourceWorkspaceTests(unittest.TestCase):
     def setUp(self):
         temporary = tempfile.TemporaryDirectory(prefix="agentdev-source-update-")
         self.addCleanup(temporary.cleanup)
-        self.base = Path(temporary.name)
+        self.base = Path(temporary.name).resolve()
         self.home = self.base / "installation"
         self.source = self.home / "app"
         self.source.mkdir(parents=True)
@@ -33,8 +34,7 @@ class SourceWorkspaceTests(unittest.TestCase):
         (self.home / "install.json").write_text(json.dumps({"repository": "test-repository"}))
         self.version = agentdev.read_version(self.source)
         for patcher in (
-            mock.patch.dict(os.environ, {"HOME": str(self.base), "GIT_CONFIG_NOSYSTEM": "1",
-                                         "GIT_CONFIG_GLOBAL": os.devnull}),
+            mock.patch.dict(os.environ, isolated_env(self.base), clear=True),
             mock.patch.object(workspace, "runtime_errors", return_value=[]),
             mock.patch.object(workspace, "project_settings", return_value={"personal": "tester"}),
             mock.patch.object(workspace, "fix_notes"),

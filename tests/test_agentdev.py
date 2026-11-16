@@ -10,6 +10,7 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
+from support import isolated_env
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +37,7 @@ class CommandAliasTests(unittest.TestCase):
             'sys.exit(int(os.environ.get("ADEV_EXIT_CODE", "0")))\n'
         )
         agentdev.write_launchers(self.home)
-        self.env = {**os.environ, "HOME": self.temporary.name,
+        self.env = {**isolated_env(Path(self.temporary.name)),
                     "ZDOTDIR": self.temporary.name, "AGENTDEV_HOME": str(self.home),
                     "PYTHONDONTWRITEBYTECODE": "1"}
         for name in ("BASH_ENV", "ENV", "ADEV_REFRESH_ENV", "ADEV_EXIT_CODE", "ADEV_REFRESHED"):
