@@ -6,7 +6,7 @@
 # - versions 库位于 publish/versions/（已写入 .gitignore），不存在时自动 clone，已存在时先 pull --ff-only 取最新版本；
 #   地址默认 git@github.com:LumenVestige/versions.git，可用环境变量 PUBLISH_VERSIONS_REPO 覆盖；
 # - 提交信息须符合 git-commit skill 的标签规则（[fix] / [feature] / [research] / [del] / [update]），提交前预先校验；
-# - AgentDevWorkSpace 提交全部改动（git add -A，遵守 .gitignore）；versions 库提交 version 文件，提交信息相同，正文附 AgentDevWorkSpace 的提交 hash；
+# - AgentDevWorkSpace 提交全部改动（git add -A，遵守 .gitignore），没有其他改动时只提交版本号；versions 库提交 version 文件，提交信息相同，正文附 AgentDevWorkSpace 的提交 hash；
 # - AgentDevWorkSpace 提交失败时两处版本号恢复原值；已完成的提交不自动撤销，推送失败时提示手动推送。
 set -e
 unset GIT_DIR GIT_WORK_TREE
@@ -27,11 +27,6 @@ tmp=$(mktemp) || exit 1
 trap 'rm -f "$tmp"' EXIT
 printf '%s\n' "$msg" > "$tmp"
 sh "${root}/skills/git-commit/commit-msg" "$tmp"
-
-if [ -z "$(git -C "${root}" status --porcelain)" ]; then
-  echo "AgentDevWorkSpace 没有可提交的改动" >&2
-  exit 1
-fi
 
 if [ -d "${versions}/.git" ]; then
   git -C "${versions}" pull -q --ff-only || { echo "拉取 versions 库失败：${versions}" >&2; exit 1; }
