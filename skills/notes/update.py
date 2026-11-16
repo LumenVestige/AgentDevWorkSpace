@@ -1,16 +1,14 @@
 #!/usr/bin/env python3
-"""AgentDevWorkSpace 自动更新：按版本号判断是否需要更新，在后台进程中进行，不阻塞、不打断正在执行的 LLM 任务。
+"""AgentDevWorkSpace 自动更新：按版本号判断是否需要更新，需要时立即在后台进程中拉取并执行 setup.sh，hook 不等待。
 
 触发（hook 只启动后台进程，立即返回，不向 stdout 输出）：
-- 会话开始：Claude Code / Codex 的 SessionStart hook（startup、clear）直接执行本脚本，每次都检查；
-- 每轮结束：verify.py（Stop hook）不阻止结束时调用 trigger()，距上次检查（agent-workspace/.agent/env/last-update）超过
-  auto_update_interval_hours 才检查。
-后台进程：
-- --check：请求 update_url（versions 库中 AgentDevWorkSpace/version 的原始内容），与 AgentDevWorkSpace 的 publish/version 比较；
-  低于远端时 git pull --ff-only（AgentDevWorkSpace 工作区有改动时跳过），拉取到新版本后写入 update-ready，等待执行 setup.sh。
-  检查可能与 LLM 任务并行，setup.sh 会覆盖 skills/common/ 和 hook 配置，所以不在这里执行；
-- --setup：存在 update-ready 时，由下一次 Stop（LLM 任务已结束）或 SessionStart（任务尚未开始）启动，执行 setup.sh，成功后删除标记。
-两种后台进程都降低优先级（nice），同一时间只运行一个（update.lock），输出写入 update.log；失败只记日志，下次触发时再试。
+- 会话开始：与欢迎语同一时机，Claude Code / Codex 的 SessionStart hook（startup、clear）执行本脚本，每次都检查；
+- 每轮结束：verify.py（Stop hook）调用 trigger()，距上次检查（agent-workspace/.agent/env/last-update）超过 auto_update_interval_hours 才检查。
+后台进程（--run）：
+- 请求 update_url（versions 库中 AgentDevWorkSpace/version 的原始内容），与 AgentDevWorkSpace 的 publish/version 比较；
+  低于远端时 git pull --ff-only（AgentDevWorkSpace 工作区有改动时跳过），拉取到新版本后立即执行 setup.sh；
+- 执行 setup.sh 前写入 update-ready，成功后删除；失败时保留，下次触发时先补执行 setup.sh（此时本地版本已与远端一致，不会再因版本触发）。
+后台进程降低优先级（nice），同一时间只运行一个（update.lock），输出写入 update.log；失败只记日志，下次触发时再试。
 配置：agent-workspace/config/notes.json5 的 auto_update（开关）、auto_update_interval_hours、update_url。
 """
 import datetime
@@ -105,18 +103,15 @@ def due(root, cfg):
 
 
 def trigger(root, cfg, session_start=False):
-    """hook 调用：有待执行的 setup 时启动 --setup；否则在会话开始或检查到期时启动 --check。任何异常都不影响 hook。"""
+    """hook 调用：会话开始或检查到期时写入检查时间并启动后台进程。任何异常都不影响 hook。"""
     try:
         if not cfg.get("auto_update", True) or running():
-            return
-        if READY.exists():
-            spawn("--setup")
             return
         if session_start or due(root, cfg):
             stamp = update_stamp_file(root)
             stamp.parent.mkdir(parents=True, exist_ok=True)
             stamp.write_text(f"{int(time.time())}\n")
-            spawn("--check")
+            spawn("--run")
     except Exception as e:  # noqa: BLE001  hook 中不能因更新失败而报错
         log(f"触发更新失败：{e!r}")
 
@@ -172,13 +167,13 @@ def check(root, cfg):
     if now <= local:
         log(f"拉取后版本仍为 {now}，未更新")
         return
+    log(f"已拉取版本 {now}，执行 setup.sh")
     READY.write_text(f"{now}\n")
-    log(f"已拉取版本 {now}，等待当前任务结束后执行 setup.sh")
+    setup(root)
 
 
 def setup(root):
-    if not READY.exists():
-        return
+    """执行 setup.sh；成功后删除 update-ready，失败时保留，下次触发时重试。"""
     skill = skill_dir()
     if not skill:
         log("找不到 AgentDevWorkSpace，无法执行 setup.sh")
@@ -189,7 +184,7 @@ def setup(root):
         r = subprocess.run(["sh", str(skill / "scripts" / "setup.sh"), *args], cwd=root,
                            stdin=subprocess.DEVNULL, stdout=out, stderr=out)
     if r.returncode:
-        log(f"setup.sh 失败（退出码 {r.returncode}），保留待执行标记，下次再试")
+        log(f"setup.sh 失败（退出码 {r.returncode}），下次触发时重试")
         return
     READY.unlink(missing_ok=True)
     log(f"已更新到版本 {local_version(skill)}")
@@ -200,16 +195,18 @@ def main():
     if len(sys.argv) == 1:  # SessionStart hook
         trigger(root, load_config(root), session_start=True)
         return 0
-    mode = sys.argv[1]
-    if mode not in ("--check", "--setup"):
-        sys.exit(f"用法：{sys.argv[0]} [--check | --setup]")
+    if sys.argv[1:] != ["--run"]:
+        sys.exit(f"用法：{sys.argv[0]} [--run]")
     os.nice(NICE)
     if not acquire():
         return 0
     try:
-        check(root, load_config(root)) if mode == "--check" else setup(root)
+        if READY.exists():  # 上次拉取后 setup.sh 失败，先补执行
+            log("补执行上次失败的 setup.sh")
+            setup(root)
+        check(root, load_config(root))
     except Exception as e:  # noqa: BLE001
-        log(f"{mode} 异常：{e!r}")
+        log(f"更新异常：{e!r}")
     finally:
         release()
     return 0

@@ -39,8 +39,8 @@ init.sh（也可单独执行：`sh <子目录>/scripts/init.sh [项目根目录]
 - 在 `agent-workspace/.agent/env/venv/` 创建 Python 3.9+ 虚拟环境，skill 中的 Python 脚本都用它运行（路径也记入 AgentDevWorkSpace 仓库的 `git config agentskill.python`，供 deps.sh / check.sh 单独执行时使用）；
 - 执行 `scripts/deps.sh`，用该虚拟环境的 pip 安装依赖（清单写在 deps.sh 中，已满足时跳过）；
 - 执行 `scripts/check.sh`，检查虚拟环境与依赖是否安装成功，失败时中止；
-- 把工作区的 `agent-workspace/skills/common/notes/verify.py` 注册为 Claude Code 的 Stop hook（写入 `.claude/settings.local.json`）和 Codex 的 Stop hook（写入 `.codex/hooks.json`）；每轮对话结束时检查未记录到 Note 的提交、工作区的大规模改动，并把超过上限的同一天 Note 合并；不阻止结束时，若距上次版本检查超过 `auto_update_interval_hours`（默认 24 小时），触发自动更新（见下一条）。Codex 的项目级 hook 只在项目被信任时加载，未信任时 setup.sh 会提示在 `~/.codex/config.toml` 中加入 `[projects."<项目根目录>"]` 和 `trust_level = "trusted"`；此外 Codex 对 hook 本身还有一道信任，首次启动（以及 hook 命令变更后）会要求确认，选择信任后才会执行；
-- 把工作区 notes skill 的 `update.py` 注册为 Claude Code 和 Codex 的 SessionStart hook（matcher `startup|clear`）：每次会话开始在后台比较本地 `publish/version` 与 versions 库的 `AgentDevWorkSpace/version`，低于远端时拉取 AgentDevWorkSpace（`git pull --ff-only`，工作区有改动时跳过），并在当前 LLM 任务结束后（下一次 Stop 或 SessionStart）于后台执行 setup.sh（同时用新的模板包覆盖 `skills/common/`）；不阻塞、不打断正在执行的任务，日志在 `agent-workspace/.agent/env/update.log`；
+- 把工作区的 `agent-workspace/skills/common/notes/verify.py` 注册为 Claude Code 的 Stop hook（写入 `.claude/settings.local.json`）和 Codex 的 Stop hook（写入 `.codex/hooks.json`）；每轮对话结束时检查未记录到 Note 的提交、工作区的大规模改动，并把超过上限的同一天 Note 合并；若距上次版本检查超过 `auto_update_interval_hours`（默认 24 小时），触发自动更新（见下一条）。Codex 的项目级 hook 只在项目被信任时加载，未信任时 setup.sh 会提示在 `~/.codex/config.toml` 中加入 `[projects."<项目根目录>"]` 和 `trust_level = "trusted"`；此外 Codex 对 hook 本身还有一道信任，首次启动（以及 hook 命令变更后）会要求确认，选择信任后才会执行；
+- 把工作区 notes skill 的 `update.py` 注册为 Claude Code 和 Codex 的 SessionStart hook（matcher `startup|clear`，与欢迎语同时）：每次会话开始在后台比较本地 `publish/version` 与 versions 库的 `AgentDevWorkSpace/version`，低于远端时立即拉取 AgentDevWorkSpace（`git pull --ff-only`，工作区有改动时跳过）并执行 setup.sh（同时用新的模板包覆盖 `skills/common/`）；hook 不等待，日志在 `agent-workspace/.agent/env/update.log`；
 - 把工作区 sdd skill 的 `welcome.py` 注册为 Claude Code 和 Codex 的 SessionStart hook（matcher `startup|clear`）：输出 SDD 快捷命令（`welcome.md`）及交给 Agent 的命令处理规则；hook 的显示时机取决于客户端。Codex CLI 启动即展示的接入方式见下节；
 - 为当前项目安装 `commit-msg` hook（转发到 `agent-workspace/skills/common/git-commit/commit-msg`），检查 `[fix]` / `[feature]` / `[del]` / `[update]` 标签。
 
@@ -112,7 +112,7 @@ skills/knowledge/search.sh      按关键词检索所有人的 feature / bugfix 
 skills/notes/SKILL.md           notes skill：Note 的路径、内容、创建、校验与配置
 skills/notes/create.py, template.md  创建 Note（git-commit-change / large-scale-file-change），自动填入时间、未记录的提交或未提交的改动
 skills/notes/verify.py          Claude Code / Codex 的 Stop hook：判断是否需要写 Note，按上限合并同一天的旧 Note，任务结束时触发自动更新
-skills/notes/update.py          自动更新：SessionStart hook 和 verify.py 触发，后台按版本号检查、拉取 AgentDevWorkSpace，任务结束后执行 setup.sh
+skills/notes/update.py          自动更新：SessionStart hook 和 verify.py 触发，后台按版本号检查，需要时立即拉取 AgentDevWorkSpace 并执行 setup.sh
 skills/notes/config.json5       Note 默认配置（JSON5，带字段注释）
 skills/notes/common.py          notes 脚本共用：根目录定位、个人目录、Note 类型与目录、配置读取、未记录提交与工作区改动扫描
 ```

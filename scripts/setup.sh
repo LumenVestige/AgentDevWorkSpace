@@ -67,7 +67,7 @@ date +%s > agent-workspace/.agent/env/last-update
 # - Stop：每轮对话结束时执行 notes skill 的 verify.py 和 sdd skill 的 check_layout.py（需求目录中新增的文件是否已归类），
 #   退出码 2 + stderr 表示阻止结束并把 stderr 交回 Agent；
 # - SessionStart（startup、clear，即新对话和 /clear）：执行 sdd skill 的 welcome.py，展示 SDD 快捷命令的欢迎语；
-#   执行 notes skill 的 update.py，在后台检查 AgentDevWorkSpace 的版本，有新版本时拉取，LLM 任务结束后再执行 setup.sh。
+#   执行 notes skill 的 update.py，在后台检查 AgentDevWorkSpace 的版本，有新版本时立即拉取并执行 setup.sh。
 # 执行工作区中的脚本，custom/ 中有同名 skill 的该脚本时优先。都是项目本地配置，不提交；同一事件已注册时不重复添加。
 # git 工程按仓库根目录定位，项目移动后仍有效；非 git 工程命令中直接写项目根目录的绝对路径。
 ignore /.claude/settings.local.json
