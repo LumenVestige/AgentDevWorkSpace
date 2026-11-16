@@ -6,7 +6,7 @@
 
 Note 位于 agent-workspace/<个人目录>/notes/<类型>/<YYYY-MM-DD>/HH-mm-ss-<topic>.md，类型为 git-commit-change 或 large-scale-file-change。
 
-配置：agent-workspace/config/notes.json5（JSON5，字段含义见其中的注释；缺少的键取本 skill 中 config.json5 的默认值）
+配置：agent-workspace/config/config.json5（JSON5，字段含义见其中的注释；缺少的键取本 skill 中 config.json5 的默认值）
 - enabled：false 时不触发 Note、不合并。
 - max_notes：当前用户每个日期目录中的 Note 超过该数量时，把最早的几条按时间顺序合并为一条，使数量回到上限；
   合并保留全部内容（含提交 hash），不删除内容，不处理别人的 Note。

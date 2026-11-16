@@ -3,6 +3,5 @@
 __pycache__/
 /agent-workspace/config/
 /agent-workspace/.agent/
-/tests/
 /agent-workspace/
-/publish/versions/
+/tests/workspace/

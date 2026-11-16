@@ -13,13 +13,13 @@
 - `skills/`：Agent 加载的 skill，随项目提交；
   - `common/`：从 AgentDevWorkSpace 的 `skills/`（通用 skill 模板包）复制，每次执行 setup 都整体覆盖，不要在这里修改；
   - `custom/`：项目自己的 skill，setup 从不改动；与 `common/` 同名时优先加载 `custom/` 中的，定制通用 skill 时先把它从 `common/` 复制过来再改；
-- `<个人目录>/`：每人一个，目录名由 `git config user.name` 生成（转小写，空格和标点换成 `-`，例如 `Tony Chen` → `tony-chen`），除 `specs/` 外随项目提交；
+- `<个人目录>/`：每人一个，已有目录不迁移；目录名由 `config.json5` 的 `personal` 指定（兼容 `peronsal`）；未指定时 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，再转小写并将空格、标点换成 `-`，除 `specs/` 外随项目提交；
   - `specs/`：个人的自定义约束 `constraints.md`，补充通用开发约束（见 `sdd` skill）；setup 时写入 `.gitignore`，不提交；
   - `feature/`、`bugfix/`、`change/`、`research/`：每个新功能、bug 修复、变更、调研一个目录 `NNN-<slug>/`，四种类型同级且独立编号；根目录只放 `spec.md`、`plan.md`、`tasks.md` 和可选的 `summary.md`，其他文件按主题归类到 `NN-<主题>/` 子目录（见 `sdd` skill「需求目录内的文件」，Stop hook 会检查）；
   - `notes/`：Note 记录（见 `notes` skill），按类型分 `git-commit-change/`、`large-scale-file-change/`，其下按 `YYYY-MM-DD/` 归档；只改动各人 `notes/` 的提交不会触发新的 Note；
-- `config/`：配置，`notes.json5` 见 `notes` skill；不提交；
+- `config/`：配置，`config.json5` 见 `notes` skill；不提交；
 - `.agent/`：本机使用，不提交；
-  - `env/`：`venv/` 是 `setup.sh` 创建的 Python 环境，依赖由 `deps.sh` 安装，skill 中的 Python 脚本都用它运行；另有 Note 校验的状态文件和 AgentDevWorkSpace 的路径；
+  - `env/`：`python-path` 记录全局安装的共享 Python 环境，skill 中的 Python 脚本用该解释器运行；macOS/Linux 的新项目保留 `venv/` 兼容链接，旧本地环境不删除；另有 Note 校验状态和 AgentDevWorkSpace 路径。全局安装由 `agentdev setup` 完成，项目接入用 `agentdev init`；
   - `tmp/`：Agent 的临时文件（中间结果、一次性脚本、抓取的日志和截图等），按任务建子目录 `tmp/<主题>/`；不要在项目根目录或其他位置新建 `.agents/`、`tmp/` 之类的临时目录；已写入 `.gitignore`，不提交，需要留作证据的内容整理后放进对应需求目录；
   - `profiles/`、`evals/`：预留。
 

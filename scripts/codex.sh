@@ -41,22 +41,33 @@ if [ -n "$interactive" ] && [ -t 1 ] && [ -d "$launch_dir" ]; then
   [ -f "$welcome" ] || welcome="$launch_root/agent-workspace/skills/common/sdd/welcome.md"
   if [ -r "$welcome" ] && [ -s "$welcome" ]; then
     ws=$launch_root/agent-workspace
+    py="$ws/.agent/env/venv/bin/python"
+    if [ -r "$ws/.agent/env/python-path" ]; then
+      py=$(cat "$ws/.agent/env/python-path")
+    fi
     updater="$ws/skills/custom/notes/update.py"
     [ -f "$updater" ] || updater="$ws/skills/common/notes/update.py"
     line=
-    if [ -f "$updater" ] && [ -x "$ws/.agent/env/venv/bin/python" ]; then
-      line=$("$ws/.agent/env/venv/bin/python" "$updater" --welcome </dev/null 2>/dev/null) || line=
+    if [ -f "$updater" ] && [ -x "$py" ]; then
+      line=$("$py" "$updater" --welcome </dev/null 2>/dev/null) || line=
     fi
     if [ -z "$line" ]; then
       skill=$(cat "$ws/.agent/env/agentskill-path" 2>/dev/null || :)
-      version=$(tr -d '[:space:]' < "$skill/publish/version" 2>/dev/null || :)
-      version=$(printf '%s\n' "$version" | LC_ALL=C awk '/^[0-9]+([.][0-9]+)?$/ { print index($0, ".") ? $0 : $0 ".0" }')
+      version=$(cat "$skill/publish/version" 2>/dev/null || :)
+      version=$(printf '%s\n' "$version" | LC_ALL=C awk -F. 'NF >= 1 && NF <= 3 { for (i=1; i<=NF; i++) if ($i !~ /^(0|[1-9][0-9]*)$/) exit; print $1 "." (NF>1?$2:0) "." (NF>2?$3:0) }')
       [ -z "$version" ] || line="AgentDevWorkSpace 版本：本地 $version"
     fi
-    printf '\n'
-    [ -z "$line" ] || printf '%s\n\n' "$line"
-    cat "$welcome"
-    printf '\n\n'
+    renderer="$ws/skills/custom/sdd/render_welcome.py"
+    [ -f "$renderer" ] || renderer="$ws/skills/common/sdd/render_welcome.py"
+    if [ -f "$renderer" ] && [ -x "$py" ] &&
+        "$py" "$renderer" --file "$welcome" --version-line "$line" 2>/dev/null; then
+      :
+    else
+      printf '\n'
+      [ -z "$line" ] || printf '%s\n\n' "$line"
+      cat "$welcome"
+      printf '\n\n'
+    fi
     exec codex --no-alt-screen "$@"
   fi
 fi

@@ -12,7 +12,7 @@ description: 写 Note（改动记录）。完成改变行为、架构、接口�
 `agent-workspace/<个人目录>/notes/<类型>/<YYYY-MM-DD>/HH-mm-ss-<topic>.md`，按类型分目录、按天归档，随项目提交。
 
 - 类型：`git-commit-change`（有未记录到 Note 的提交时写）、`large-scale-file-change`（工作区有大规模未提交的改动时写）；
-- 个人目录名由 `git config user.name` 生成（转小写，空格和标点换成 `-`），例如 `Tony Chen` → `tony-chen`；
+- 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不迁移已有目录；
 - 日期目录和文件名中的时间取创建时刻，文件名不再包含年月日；topic 用小写字母、数字加 `-`；
 - 例如 `agent-workspace/tony/notes/git-commit-change/2026-08-25/14-30-05-local-cli-status-restart.md`；
 - 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由 setup 时执行的 `scripts/fix.sh` 移到 `git-commit-change/<YYYY-MM-DD>/`。
@@ -58,21 +58,24 @@ agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/v
 
 ## 自动更新
 
-`update.py` 按版本号判断 AgentDevWorkSpace 是否需要更新；hook 只启动后台进程、立即返回，需要更新时后台进程立即拉取并执行 setup.sh：
+仅支持 macOS/Linux。全局安装使用 `agentdev setup`，项目初始化使用 `agentdev init`；实际更新拆到 `update.sh`，与 `agentdev update` 共用跨平台核心。
 
-- 触发：每次会话开始（SessionStart hook，startup / clear）由欢迎语调用 `update.py --welcome`，Codex 启动入口 `scripts/codex.sh` 打印欢迎语时也调用；每轮结束时（verify.py）距上次检查超过 `auto_update_interval_hours` 才检查；
-- 版本：支持非负整数和十进制小数，按十进制数精确比较；整数显示时自动补 `.0`（`7` → `7.0`），已有小数保留（`7.1` → `7.1`）。发现新版本且后台更新已启动时提示“发现远端版本更新，由本地6.0版本更新到7.0版本”；自动更新关闭或启动失败时在提示后附状态说明；
-- 更新：请求 `update_url`（versions 库的 `AgentDevWorkSpace/version`），与 AgentDevWorkSpace 的 `publish/version` 比较；本地低于远端时 `git pull --ff-only`（AgentDevWorkSpace 工作区有改动时跳过），拉取到新版本后立即执行 setup.sh（同时用新的模板包覆盖 `skills/common/`）；
-- 失败重试：执行 setup.sh 前写入 `agent-workspace/.agent/env/update-ready`，成功后删除；失败时保留，下次触发时先补执行 setup.sh；
-- 后台进程降低优先级（nice），同一时间只运行一个（`update.lock`）；过程和失败原因写入 `agent-workspace/.agent/env/update.log`，失败不影响 hook。
+- `update.py` 只负责欢迎语/Stop hook 的版本查询、后台触发、项目锁和日志；不再执行全局 setup 或在项目副本中 git pull。
+- 欢迎语 `--welcome` 每次检查，Stop 按 `auto_update_interval_hours` 到期检查；已有远端版本传给后台进程，避免重复查询。
+- 后台通过全局程序更新安装目录，并重新初始化当前工作区，保留 custom、个人约束和 Note。失败记录 update-ready，之后重试。
+- 版本使用大版本.小版本.补丁版本的整数三元组比较，例如 0.9.10 > 0.9.2；兼容读取旧一、两段版本并补齐三段。唯一版本源是主仓库 master 的 publish/version，旧配置地址自动映射，init 会保留注释并迁移。发现更新时提示“发现远端版本更新，由本地0.3.0版本更新到0.3.1版本”。
+- 后台进程使用 POSIX 会话分离与存活检查；全局程序另有安装/更新互斥锁。
+
+skill 运行时优先使用 `agent-workspace/.agent/env/python-path` 记录的共享解释器；旧项目本地 venv 为兼容回退。新项目保留 `venv/` 兼容链接。
 
 ## 配置
 
-`agent-workspace/config/notes.json5`（JSON5，每个字段都有注释；缺少的字段取本 skill 中 `config.json5` 的默认值）：
+`agent-workspace/config/config.json5`（JSON5，每个字段都有注释；缺少的字段取本 skill 中 `config.json5` 的默认值）：
 
+- `personal`：个人目录名，留空时 Git 根目录用 git user.name、非 Git 目录用电脑用户名；兼容 `peronsal`，非空 `personal` 优先。修改后不移动旧目录；
 - `enabled`：是否开启 Note 校验；
 - `max_notes`：每个日期目录（`notes/<类型>/<YYYY-MM-DD>/`）的 Note 上限，超过时合并最早的，默认 100；
 - `auto_update`：是否开启自动更新，默认开启；与 `enabled` 相互独立；
 - `auto_update_interval_hours`：每轮结束时版本检查的间隔（小时），默认 24，上次检查时间记在 `agent-workspace/.agent/env/last-update`；会话开始时每次都检查；
-- `update_url`：远端版本号地址，默认 versions 库 `AgentDevWorkSpace/version` 的原始内容（`https://raw.githubusercontent.com/LumenVestige/versions/main/AgentDevWorkSpace/version`）；
+- `update_url`：远端版本号地址，默认主仓库 `master/publish/version` 的原始内容；
 - `scan`：触发条件。`commits` 为 true 时存在未记录的提交即触发；`include_merges` 是否计入 merge 提交；`paths` / `exclude_paths` 只统计 / 不统计改动这些路径的提交和工作区改动（git pathspec）；`large_change`（`enabled`、`files` 默认 20、`lines` 默认 1000）是大规模改动的触发阈值，改动快照记在 `agent-workspace/.agent/env/large-change-base`。

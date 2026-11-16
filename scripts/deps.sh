@@ -1,7 +1,7 @@
 #!/bin/sh
 # 用法：sh <AgentDevWorkSpace 路径>/scripts/deps.sh [python 解释器]
-# 用指定虚拟环境的 pip 安装 AgentDevWorkSpace Python 脚本的依赖。解释器默认取 git config agentskill.python（setup.sh 写入，即 agent-workspace/.agent/env/venv）。
-# setup.sh 每次执行都会调用；依赖已满足时 pip 直接跳过。
+# 依赖清单供跨平台全局安装器读取；此 POSIX 辅助入口也可手动安装到指定解释器。
+# 默认优先使用全局共享 venv，其次读取当前项目的 python-path / agentskill.python。
 set -e
 unset GIT_DIR GIT_WORK_TREE
 
@@ -9,7 +9,14 @@ unset GIT_DIR GIT_WORK_TREE
 deps="json5==0.12.1"
 
 skill_dir=$(cd "$(dirname "$0")/.." && pwd -P)
-py=${1:-$(git -C "$skill_dir" config agentskill.python || true)}
+py=${1:-}
+if [ -z "$py" ] && [ -f "$skill_dir/.agentdev-app" ]; then
+  py="$skill_dir/../venv/bin/python"
+fi
+if [ -z "$py" ] && [ -f agent-workspace/.agent/env/python-path ]; then
+  py=$(cat agent-workspace/.agent/env/python-path)
+fi
+[ -n "$py" ] || py=$(git config agentskill.python 2>/dev/null || true)
 if [ -z "$py" ] || ! "$py" -c '' 2>/dev/null; then
   echo "未找到虚拟环境的解释器，请先执行 setup.sh，或传入解释器路径" >&2
   exit 1

@@ -8,12 +8,22 @@ Codex CLI 输入前的欢迎语由 scripts/codex.sh 启动入口打印，不要�
 读不到 welcome.md 时不输出，不影响会话。
 """
 import json
-import re
 import subprocess
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
+
 HERE = Path(__file__).resolve().parent  # agent-workspace/skills/<common|custom>/sdd/
+shared = HERE.parent if (HERE.parent / "_version.py").is_file() else HERE.parent.parent / "common"
+sys.path.insert(0, str(shared))
+from _version import parse_version, format_version
+
+try:
+    from render_welcome import render_welcome
+except ImportError:
+    render_welcome = None
+
 
 try:
     text = (HERE / "welcome.md").read_text(encoding="utf-8").strip()
@@ -24,12 +34,22 @@ except OSError:
 WS = HERE.parents[2]  # agent-workspace/
 
 
+def interpreter():
+    try:
+        path = (WS / ".agent/env/python-path").read_text(encoding="utf-8").strip()
+        if path:
+            return path
+    except OSError:
+        pass
+    return str(WS / ".agent/env/venv/bin/python")
+
+
 def version_line():
     updater = WS / "skills" / "custom" / "notes" / "update.py"
     if not updater.is_file():
         updater = WS / "skills" / "common" / "notes" / "update.py"
     try:
-        r = subprocess.run([str(WS / ".agent" / "env" / "venv" / "bin" / "python"), str(updater), "--welcome"],
+        r = subprocess.run([interpreter(), str(updater), "--welcome"],
                            stdin=subprocess.DEVNULL, capture_output=True, text=True, timeout=10)
         line = r.stdout.strip()
         if r.returncode == 0 and line:
@@ -41,15 +61,17 @@ def version_line():
         v = (skill / "publish" / "version").read_text(encoding="utf-8").strip()
     except OSError:
         return ""
-    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", v):
+    try:
+        return f"AgentDevWorkSpace 版本：本地 {format_version(parse_version(v, allow_legacy=True))}"
+    except ValueError:
         return ""
-    if "." not in v:
-        v += ".0"
-    return f"AgentDevWorkSpace 版本：本地 {v}"
+
 
 
 line = version_line()
-if line:
+if render_welcome is not None:
+    text = render_welcome(text, line)
+elif line:
     text = f"{line}\n\n{text}"
 
 context = ("SDD 快捷命令：用户输入「创建feature:<名称>」「创建bugfix:<名称>」「创建change:<名称>」「创建research:<名称>」"

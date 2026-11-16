@@ -1,0 +1,3 @@
+#!/bin/sh
+agentdev_directory=$(CDPATH= cd "$(dirname "$0")" && pwd -P)
+exec sh "$agentdev_directory/scripts/bootstrap.sh" "$@"
