@@ -73,12 +73,14 @@ setup 不会自动修改全局 shell 配置；移除该函数即可恢复原生�
 
 ```sh
 sh publish/publish.sh "[update] <改动说明>"
+# 指定目标版本（省略时自动加 0.1）
+sh publish/publish.sh "[update] 发布版本 0.3" 0.3
 ```
 
 - 提交信息须符合 git-commit skill 的标签规则，提交前预先校验；
 - versions 库位于 `publish/versions/`（已写入 `.gitignore`），不存在时自动 clone `git@github.com:LumenVestige/versions.git`，已存在时先 `pull --ff-only`；
 - 版本号支持非负整数和十进制小数，同时记在本库的 `publish/version` 和 versions 库的 `AgentDevWorkSpace/version`；按十进制数精确比较，`7` 与 `7.0`、`7.1` 与 `7.10` 分别视为相同版本。数值不一致时报错（通常是本地不是最新，先 `git pull`）；
-- 两处版本号都加 1（例如 `7` → `8.0`、`7.1` → `8.1`），整数版本显示和写入时自动补 `.0`，已有小数保留；提交 AgentDevWorkSpace 的全部改动（`git add -A`；没有其他改动时只提交版本号），再提交 versions 库（提交信息相同，正文附 AgentDevWorkSpace 的提交 hash），最后两个库都推送当前分支。发布脚本优先使用项目 venv，缺失时使用 `python3`；
+- 未指定版本号时，两处版本号精确加 `0.1`（例如 `0.2` → `0.3`、`0.9` → `1.0`）；通过可选第二参数指定版本号时，两处直接使用该版本。整数版本显示和写入时自动补 `.0`，已有小数保留；提交 AgentDevWorkSpace 的全部改动（`git add -A`；没有其他改动时只提交版本号），再提交 versions 库（提交信息相同，正文附 AgentDevWorkSpace 的提交 hash），最后两个库都推送当前分支。发布脚本优先使用项目 venv，缺失时使用 `python3`；
 - 旧版仅支持整数的更新器无法识别远端小数版本；已有客户端需先更新代码并重新执行 setup.sh，同步新的更新器后再使用小数版本；
 - AgentDevWorkSpace 提交失败时两处版本号恢复原值；推送失败时提示哪个库需要手动推送，已完成的提交不自动撤销。
 
@@ -96,7 +98,7 @@ scripts/check.sh           检查虚拟环境与依赖（setup.sh 自动调用�
 scripts/fix.sh             升级兼容：把旧版本的工作区文件改成新格式（setup.sh 自动调用，也可单独执行）
 scripts/codex.sh           Codex CLI 启动入口：输入首条消息前打印欢迎语
 scripts/root.sh            确定项目根目录，.git/info/exclude 写入（setup.sh、init.sh 共用）
-publish/publish.sh         发布：版本号加 1，提交并推送 AgentDevWorkSpace 和 versions 库（publish/versions/）
+publish/publish.sh         发布：默认版本号加 0.1，支持指定版本，提交并推送两个库（versions 位于 publish/versions/）
 publish/version            AgentDevWorkSpace 当前版本号，与 versions 库的 AgentDevWorkSpace/version 一致
 skills/git-commit/SKILL.md      git-commit skill：提交信息规则
 skills/git-commit/commit-msg    提交标签校验（commit-msg hook）

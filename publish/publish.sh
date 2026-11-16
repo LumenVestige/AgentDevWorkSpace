@@ -1,6 +1,6 @@
 #!/bin/sh
-# 用法：sh publish/publish.sh "<提交信息>"
-# 发布 AgentDevWorkSpace：提交前把版本号加 1，再提交并推送 AgentDevWorkSpace 和 versions 两个库。
+# 用法：sh publish/publish.sh "<提交信息>" [版本号]
+# 发布 AgentDevWorkSpace：未指定版本号时提交前加 0.1，指定时使用该版本，再提交并推送 AgentDevWorkSpace 和 versions 两个库。
 # - 版本号是非负整数或十进制小数，同时记在本库的 publish/version 和 versions 库的 AgentDevWorkSpace/version，两者数值须一致：
 #   不一致时报错退出（通常是本地 AgentDevWorkSpace 不是最新，先 git pull）；某一处不存在或为空时取另一处的值，都没有时视为 0；
 # - versions 库位于 publish/versions/（已写入 .gitignore），不存在时自动 clone，已存在时先 pull --ff-only 取最新版本；
@@ -11,11 +11,12 @@
 set -e
 unset GIT_DIR GIT_WORK_TREE
 
-if [ $# -ne 1 ] || [ -z "$1" ]; then
-  echo "用法：sh $0 \"<提交信息>\"" >&2
+if [ $# -lt 1 ] || [ $# -gt 2 ] || [ -z "$1" ]; then
+  echo "用法：sh $0 \"<提交信息>\" [版本号]" >&2
   exit 1
 fi
 msg=$1
+target_version=${2:-}
 root=$(cd "$(dirname "$0")/.." && pwd -P)
 versions=${root}/publish/versions
 repo=${PUBLISH_VERSIONS_REPO:-git@github.com:LumenVestige/versions.git}
@@ -37,10 +38,10 @@ else
   git clone -q "${repo}" "${versions}" || { echo "拉取 versions 库失败：${repo}" >&2; exit 1; }
 fi
 
-# 用十进制数比较和加 1，兼容旧整数版本；输出和写入时整数自动补 .0。
+# 用十进制数比较，未指定目标版本时精确加 0.1；输出和写入时整数自动补 .0。
 py=${root}/agent-workspace/.agent/env/venv/bin/python
 [ -x "$py" ] || py=python3
-version_pair=$("$py" - "${lfile}" "${vfile}" <<'PY'
+version_pair=$("$py" - "${lfile}" "${vfile}" "$target_version" <<'PY'
 import re
 import sys
 from decimal import Decimal, localcontext
@@ -62,13 +63,16 @@ def format_version(version):
     return text if "." in text else f"{text}.0"
 
 
-local, remote = (read_version(file) for file in sys.argv[1:])
+local, remote = (read_version(file) for file in sys.argv[1:3])
 if local is not None and remote is not None and local != remote:
     sys.exit(f"版本号不一致：publish/version 为 {local}，versions 库为 {remote}；请先 git pull 更新 AgentDevWorkSpace，或手动对齐两者")
 old = remote if remote is not None else local if local is not None else Decimal("0.0")
+target = sys.argv[3]
+if target and not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", target):
+    sys.exit(f"指定的版本号不是非负整数或小数：{target}")
 with localcontext() as ctx:
     ctx.prec = max(28, len(format(old, "f")) + 2)
-    new = old + 1
+    new = Decimal(target) if target else old + Decimal("0.1")
 print(format_version(old), format_version(new))
 PY
 ) || exit 1
