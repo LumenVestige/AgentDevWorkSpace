@@ -3,7 +3,7 @@
 
 触发：
 - 展示欢迎语：sdd skill 的 welcome.py（SessionStart hook）和 Codex 启动入口 scripts/codex.sh 执行 `update.py --welcome`：
-  当场请求远端版本（WELCOME_TIMEOUT 秒内），向 stdout 输出一行「AgentDevWorkSpace 版本：本地 X，远端 Y（状态）」供欢迎语展示；
+  当场请求远端版本（WELCOME_TIMEOUT 秒内），需要更新时输出「发现远端版本更新，由本地X版本更新到Y版本」供欢迎语展示；
   本地低于远端（或上次 setup.sh 失败待重试）时立即启动后台进程更新，并把已取得的远端版本传给它，不重复请求；
 - 每轮结束：verify.py（Stop hook）调用 trigger()，距上次检查（agent-workspace/.agent/env/last-update）超过 auto_update_interval_hours 才检查。
 远端版本：先请求 update_url（默认 GitHub API 的 contents 接口，发布后立即可见），它是 GitHub API 地址时失败再回退到 raw 地址
@@ -17,11 +17,13 @@
 """
 import datetime
 import os
+import re
 import subprocess
 import sys
 import tempfile
 import time
 import urllib.request
+from decimal import Decimal
 
 sys.dont_write_bytecode = True  # 不在工作区副本中生成 __pycache__
 
@@ -119,23 +121,29 @@ def trigger(root, cfg, now=False, remote=None):
         stamp = update_stamp_file(root)
         stamp.parent.mkdir(parents=True, exist_ok=True)
         stamp.write_text(f"{int(time.time())}\n")
-        spawn("--run", *(["--remote", str(remote)] if remote is not None else []))
+        spawn("--run", *(["--remote", format_version(remote)] if remote is not None else []))
         return True
     except Exception as e:  # noqa: BLE001  hook 中不能因更新失败而报错
         log(f"触发更新失败：{e!r}")
         return False
 
 
-def read_int(text):
+def read_version(text):
     text = (text or "").strip()
-    return int(text) if text.isdigit() else None
+    return Decimal(text) if re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", text) else None
+
+
+def format_version(version):
+    text = format(version, "f")
+    return text if "." in text else f"{text}.0"
 
 
 def local_version(skill):
     try:
-        return read_int((skill / "publish" / "version").read_text(encoding="utf-8")) or 0
+        version = read_version((skill / "publish" / "version").read_text(encoding="utf-8"))
+        return version if version is not None else Decimal("0.0")
     except OSError:
-        return 0
+        return Decimal("0.0")
 
 
 def fetch_remote(cfg, timeout):
@@ -148,13 +156,13 @@ def fetch_remote(cfg, timeout):
         req = urllib.request.Request(url, headers={"Accept": "application/vnd.github.raw", "User-Agent": "AgentDevWorkSpace-update"})
         try:
             with urllib.request.urlopen(req, timeout=per) as r:
-                v = read_int(r.read(64).decode("utf-8", "ignore"))
+                v = read_version(r.read(64).decode("utf-8", "ignore"))
         except Exception as e:  # noqa: BLE001
             log(f"获取远端版本失败：{url}：{e!r}")
             continue
         if v is not None:
             return v
-        log(f"远端版本不是整数：{url}")
+        log(f"远端版本不是非负整数或小数：{url}")
     return None
 
 
@@ -233,8 +241,15 @@ def welcome(root):
             state = "正在后台更新" if trigger(root, cfg, now=True, remote=remote) else "有新版本，启动更新失败"
     else:
         state = "已是最新"
-    print(f"AgentDevWorkSpace 版本：本地 {local if local is not None else '未知'}，"
-          f"远端 {remote if remote is not None else '未知'}（{state}）")
+    local_text = format_version(local) if local is not None else "未知"
+    remote_text = format_version(remote) if remote is not None else "未知"
+    if local is not None and remote is not None and local < remote:
+        line = f"发现远端版本更新，由本地{local_text}版本更新到{remote_text}版本"
+        if state != "正在后台更新":
+            line += f"（{state}）"
+        print(line)
+    else:
+        print(f"AgentDevWorkSpace 版本：本地 {local_text}，远端 {remote_text}（{state}）")
 
 
 def main():
@@ -245,9 +260,9 @@ def main():
     if args == ["--welcome"]:
         welcome(root)
         return 0
-    if args[:1] != ["--run"] or not (len(args) == 1 or (len(args) == 3 and args[1] == "--remote" and args[2].isdigit())):
+    if args[:1] != ["--run"] or not (len(args) == 1 or (len(args) == 3 and args[1] == "--remote" and read_version(args[2]) is not None)):
         sys.exit(f"用法：{sys.argv[0]} --welcome | --run [--remote <版本号>]")
-    remote = int(args[2]) if len(args) == 3 else None
+    remote = read_version(args[2]) if len(args) == 3 else None
     os.nice(NICE)
     if not acquire():
         return 0

@@ -50,7 +50,8 @@ if [ -n "$interactive" ] && [ -t 1 ] && [ -d "$launch_dir" ]; then
     if [ -z "$line" ]; then
       skill=$(cat "$ws/.agent/env/agentskill-path" 2>/dev/null || :)
       version=$(tr -d '[:space:]' < "$skill/publish/version" 2>/dev/null || :)
-      case "$version" in ''|*[!0-9]*) ;; *) line="AgentDevWorkSpace 版本：本地 $version" ;; esac
+      version=$(printf '%s\n' "$version" | LC_ALL=C awk '/^[0-9]+([.][0-9]+)?$/ { print index($0, ".") ? $0 : $0 ".0" }')
+      [ -z "$version" ] || line="AgentDevWorkSpace 版本：本地 $version"
     fi
     printf '\n'
     [ -z "$line" ] || printf '%s\n\n' "$line"

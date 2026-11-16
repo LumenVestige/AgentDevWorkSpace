@@ -1,7 +1,7 @@
 #!/bin/sh
 # 用法：sh publish/publish.sh "<提交信息>"
 # 发布 AgentDevWorkSpace：提交前把版本号加 1，再提交并推送 AgentDevWorkSpace 和 versions 两个库。
-# - 版本号是一个非负整数，同时记在本库的 publish/version 和 versions 库的 AgentDevWorkSpace/version，两者须一致：
+# - 版本号是非负整数或十进制小数，同时记在本库的 publish/version 和 versions 库的 AgentDevWorkSpace/version，两者数值须一致：
 #   不一致时报错退出（通常是本地 AgentDevWorkSpace 不是最新，先 git pull）；某一处不存在或为空时取另一处的值，都没有时视为 0；
 # - versions 库位于 publish/versions/（已写入 .gitignore），不存在时自动 clone，已存在时先 pull --ff-only 取最新版本；
 #   地址默认 git@github.com:LumenVestige/versions.git，可用环境变量 PUBLISH_VERSIONS_REPO 覆盖；
@@ -37,21 +37,43 @@ else
   git clone -q "${repo}" "${versions}" || { echo "拉取 versions 库失败：${repo}" >&2; exit 1; }
 fi
 
-# 读取版本号文件：输出去掉空白后的内容；不存在时输出空；不是非负整数时报错退出。
-read_version() {
-  [ -f "$1" ] || return 0
-  v=$(tr -d '[:space:]' < "$1")
-  case "$v" in *[!0-9]*) echo "$1 的内容不是非负整数：$v" >&2; return 1 ;; esac
-  echo "$v"
-}
-local_v=$(read_version "${lfile}")
-remote_v=$(read_version "${vfile}")
-if [ -n "${local_v}" ] && [ -n "${remote_v}" ] && [ "${local_v}" -ne "${remote_v}" ]; then
-  echo "版本号不一致：publish/version 为 ${local_v}，versions 库为 ${remote_v}；请先 git pull 更新 AgentDevWorkSpace，或手动对齐两者" >&2
-  exit 1
-fi
-old=${remote_v:-${local_v:-0}}
-new=$(( old + 1 ))
+# 用十进制数比较和加 1，兼容旧整数版本；输出和写入时整数自动补 .0。
+py=${root}/agent-workspace/.agent/env/venv/bin/python
+[ -x "$py" ] || py=python3
+version_pair=$("$py" - "${lfile}" "${vfile}" <<'PY'
+import re
+import sys
+from decimal import Decimal, localcontext
+from pathlib import Path
+
+
+def read_version(file):
+    path = Path(file)
+    text = path.read_text(encoding="utf-8").strip() if path.is_file() else ""
+    if not text:
+        return None
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", text):
+        sys.exit(f"{path} 的内容不是非负整数或小数：{text}")
+    return Decimal(text)
+
+
+def format_version(version):
+    text = format(version, "f")
+    return text if "." in text else f"{text}.0"
+
+
+local, remote = (read_version(file) for file in sys.argv[1:])
+if local is not None and remote is not None and local != remote:
+    sys.exit(f"版本号不一致：publish/version 为 {local}，versions 库为 {remote}；请先 git pull 更新 AgentDevWorkSpace，或手动对齐两者")
+old = remote if remote is not None else local if local is not None else Decimal("0.0")
+with localcontext() as ctx:
+    ctx.prec = max(28, len(format(old, "f")) + 2)
+    new = old + 1
+print(format_version(old), format_version(new))
+PY
+) || exit 1
+old=${version_pair% *}
+new=${version_pair#* }
 
 # 写入两处版本号；AgentDevWorkSpace 提交失败时恢复原样（原本不存在的文件删除）。
 lexisted=; [ -f "${lfile}" ] && lexisted=1 && lold=$(cat "${lfile}")

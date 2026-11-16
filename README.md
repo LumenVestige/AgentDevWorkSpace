@@ -40,7 +40,7 @@ init.sh（也可单独执行：`sh <子目录>/scripts/init.sh [项目根目录]
 - 执行 `scripts/deps.sh`，用该虚拟环境的 pip 安装依赖（清单写在 deps.sh 中，已满足时跳过）；
 - 执行 `scripts/check.sh`，检查虚拟环境与依赖是否安装成功，失败时中止；
 - 把工作区的 `agent-workspace/skills/common/notes/verify.py` 注册为 Claude Code 的 Stop hook（写入 `.claude/settings.local.json`）和 Codex 的 Stop hook（写入 `.codex/hooks.json`）；每轮对话结束时检查未记录到 Note 的提交、工作区的大规模改动，并把超过上限的同一天 Note 合并；若距上次版本检查超过 `auto_update_interval_hours`（默认 24 小时），触发自动更新（见下一条）。Codex 的项目级 hook 只在项目被信任时加载，未信任时 setup.sh 会提示在 `~/.codex/config.toml` 中加入 `[projects."<项目根目录>"]` 和 `trust_level = "trusted"`；此外 Codex 对 hook 本身还有一道信任，首次启动（以及 hook 命令变更后）会要求确认，选择信任后才会执行；
-- 把工作区 notes skill 的 `update.py` 注册为 Claude Code 和 Codex 的 SessionStart hook（matcher `startup|clear`，与欢迎语同时）：每次会话开始在后台比较本地 `publish/version` 与 versions 库的 `AgentDevWorkSpace/version`，低于远端时立即拉取 AgentDevWorkSpace（`git pull --ff-only`，工作区有改动时跳过）并执行 setup.sh（同时用新的模板包覆盖 `skills/common/`）；hook 不等待，日志在 `agent-workspace/.agent/env/update.log`；
+- 欢迎语通过 notes skill 的 `update.py --welcome` 查询远端版本（GitHub API 失败时回退到 raw 地址）；本地 `publish/version` 低于 versions 库的 `AgentDevWorkSpace/version` 时，显示“发现远端版本更新，由本地6.0版本更新到7.0版本”，并在后台拉取 AgentDevWorkSpace（`git pull --ff-only`，工作区有改动时跳过）及执行 setup.sh（同时用新的模板包覆盖 `skills/common/`）；日志在 `agent-workspace/.agent/env/update.log`；
 - 把工作区 sdd skill 的 `welcome.py` 注册为 Claude Code 和 Codex 的 SessionStart hook（matcher `startup|clear`）：输出 AgentDevWorkSpace 的版本号和 SDD 快捷命令（`welcome.md`）及交给 Agent 的命令处理规则；hook 的显示时机取决于客户端。Codex CLI 启动即展示的接入方式见下节；
 - 为当前项目安装 `commit-msg` hook（转发到 `agent-workspace/skills/common/git-commit/commit-msg`），检查 `[fix]` / `[feature]` / `[del]` / `[update]` 标签。
 
@@ -52,7 +52,7 @@ init.sh（也可单独执行：`sh <子目录>/scripts/init.sh [项目根目录]
 sh <AgentDevWorkSpace 路径>/scripts/codex.sh
 ```
 
-入口先打印 AgentDevWorkSpace 的版本号（`publish/version`）和项目 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），并在后台触发一次自动更新检查（notes skill 的 `update.py`，立即返回），
+入口先查询并打印 AgentDevWorkSpace 的版本信息或更新提示，以及项目 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common）；发现新版本时在后台更新（notes skill 的 `update.py --welcome`），
 再用 `--no-alt-screen` 启动原生 Codex，保留终端中的欢迎语；不发送初始消息、不调用模型。
 `--help`、`--version`、`exec` 等子命令、恢复会话及重定向输出直接转发，不打印欢迎语。
 支持从项目子目录启动和 `-C/--cd` 指定项目。此入口只处理进程启动，CLI 内部 `/clear` 仍由 hook 处理。
@@ -77,8 +77,9 @@ sh publish/publish.sh "[update] <改动说明>"
 
 - 提交信息须符合 git-commit skill 的标签规则，提交前预先校验；
 - versions 库位于 `publish/versions/`（已写入 `.gitignore`），不存在时自动 clone `git@github.com:LumenVestige/versions.git`，已存在时先 `pull --ff-only`；
-- 版本号（一个整数）同时记在本库的 `publish/version` 和 versions 库的 `AgentDevWorkSpace/version`，两者须一致，不一致时报错（通常是本地不是最新，先 `git pull`）；
-- 两处版本号都加 1，提交 AgentDevWorkSpace 的全部改动（`git add -A`；没有其他改动时只提交版本号），再提交 versions 库（提交信息相同，正文附 AgentDevWorkSpace 的提交 hash），最后两个库都推送当前分支；
+- 版本号支持非负整数和十进制小数，同时记在本库的 `publish/version` 和 versions 库的 `AgentDevWorkSpace/version`；按十进制数精确比较，`7` 与 `7.0`、`7.1` 与 `7.10` 分别视为相同版本。数值不一致时报错（通常是本地不是最新，先 `git pull`）；
+- 两处版本号都加 1（例如 `7` → `8.0`、`7.1` → `8.1`），整数版本显示和写入时自动补 `.0`，已有小数保留；提交 AgentDevWorkSpace 的全部改动（`git add -A`；没有其他改动时只提交版本号），再提交 versions 库（提交信息相同，正文附 AgentDevWorkSpace 的提交 hash），最后两个库都推送当前分支。发布脚本优先使用项目 venv，缺失时使用 `python3`；
+- 旧版仅支持整数的更新器无法识别远端小数版本；已有客户端需先更新代码并重新执行 setup.sh，同步新的更新器后再使用小数版本；
 - AgentDevWorkSpace 提交失败时两处版本号恢复原值；推送失败时提示哪个库需要手动推送，已完成的提交不自动撤销。
 
 ## 文件列表

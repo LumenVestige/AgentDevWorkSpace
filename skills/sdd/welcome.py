@@ -8,6 +8,7 @@ Codex CLI 输入前的欢迎语由 scripts/codex.sh 启动入口打印，不要�
 读不到 welcome.md 时不输出，不影响会话。
 """
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -40,7 +41,11 @@ def version_line():
         v = (skill / "publish" / "version").read_text(encoding="utf-8").strip()
     except OSError:
         return ""
-    return f"AgentDevWorkSpace 版本：本地 {v}" if v.isdigit() else ""
+    if not re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", v):
+        return ""
+    if "." not in v:
+        v += ".0"
+    return f"AgentDevWorkSpace 版本：本地 {v}"
 
 
 line = version_line()
