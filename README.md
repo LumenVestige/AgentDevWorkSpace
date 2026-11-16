@@ -67,6 +67,8 @@ setup 可从当前源码安装，包含尚未提交的源码改动；更新根�
 
 `agentdev check` 不修复或写入文件；它检查当前目录是否存在有效工作区、安装路径和解释器是否可用、Python 3.9+/venv/pip/依赖版本、Note 配置格式以及必要 hook。缺项会列出并返回非零。`agentdev init` 已自动执行该检查，日常初始化无需再手动 check。更新后自动刷新当前工作区；其他项目可重新执行 `agentdev init` 同步模板。
 
+在 AgentDevWorkSpace 自身的源码根目录中，`update` 刷新工作区时不会创建、追加或替换 `AGENTS.md` 和 `.gitignore`；skills、环境指针及 hook 仍正常同步，手动 `init` 也遵循相同保护。源码目录通过 Git remote URL 识别（任意 remote 指向主仓库即可，兼容 HTTPS、SSH/SCP 与 git 协议、可选 `.git` 后缀），不依赖目录名或源码文件布局，并排除带 `.agentdev-app` 标记的受管理安装；普通项目保持原有行为。此前已写入这两个文件的内容不会自动清理。
+
 ## 个人目录与统一配置
 
 配置路径为 `agent-workspace/config/config.json5`，例如：

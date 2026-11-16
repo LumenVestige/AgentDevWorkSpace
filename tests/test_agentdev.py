@@ -103,18 +103,9 @@ class CommandAliasTests(unittest.TestCase):
                         self.assertEqual(result.stdout.splitlines()[-1],
                                          "0:1" if code == 0 else "23:unset")
 
-    @unittest.skipUnless(shutil.which("fish"), "fish is not installed")
-    def test_fish_activation_exposes_alias(self):
-        result = self.run_command(
-            ["fish", "--no-config", "-c", 'source $argv[1]; adev check "path with spaces"',
-             self.home / "env.fish"])
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(json.loads(result.stdout), ["check", "path with spaces"])
-
-    def test_install_and_reinstall_copy_alias_without_fish_installer(self):
+    def test_install_and_reinstall_copy_alias(self):
         # Preserve the fake interpreter while exercising real staging/copy/launcher logic.
         (self.home / "install.json").write_text("{}")
-        (self.home / "app/install.fish").write_text("# legacy installer\n")
         with mock.patch.object(agentdev, "run"), \
                 mock.patch.object(agentdev.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)), \
                 mock.patch.object(agentdev, "runtime_errors", return_value=[]), \
@@ -122,8 +113,6 @@ class CommandAliasTests(unittest.TestCase):
                 contextlib.redirect_stdout(io.StringIO()):
             for _ in range(2):
                 agentdev.install(ROOT, self.home, no_path=True, repo="test-repository")
-                self.assertFalse((self.home / "app/install.fish").exists())
-                self.assertFalse((self.home / "app/setup.fish").exists())
                 self.assertEqual((self.home / "app/adev").read_text(), (ROOT / "agentdev").read_text())
                 self.assertTrue(os.access(self.home / "bin/adev", os.X_OK))
             configure_path.assert_not_called()

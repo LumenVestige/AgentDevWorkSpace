@@ -10,6 +10,9 @@ import subprocess
 import sys
 import tempfile
 import time
+from urllib.parse import urlsplit
+
+REPOSITORY = "https://github.com/LumenVestige/AgentDevWorkSpace.git"
 
 MARK_BEGIN = "<!-- agentskill:begin 以下内容由 AgentDevWorkSpace 的 init.sh 追加，重新执行时会被替换，请勿修改 -->"
 MARK_END = "<!-- agentskill:end -->"
@@ -181,6 +184,27 @@ def fix_notes(project):
                 file.rename(target)
 
 
+def repository_identity(url):
+    """统一 URL 和 SCP 风格地址，仅比较主机与仓库路径。"""
+    url = re.sub(r"^([^/:]+):(?=[^/])", r"ssh://\1/", url.strip())
+    try:
+        parsed = urlsplit(url)
+        if parsed.scheme not in {"https", "http", "ssh", "git"} or not parsed.hostname:
+            return None
+        return parsed.hostname.lower(), parsed.path.strip("/").lower().removesuffix(".git")
+    except ValueError:
+        return None
+
+
+def is_source_repository(project):
+    """通过 Git remote URL 识别主仓库，排除受管理安装。"""
+    expected = repository_identity(REPOSITORY)
+    return not (project / ".agentdev-app").exists() and any(
+        repository_identity(line.partition(" ")[2]) == expected
+        for line in git(project, "config", "--get-regexp", r"^remote\..*\.url$").splitlines()
+    )
+
+
 def initialize(source, home, project):
     project = project.absolute().resolve()
     if not project.is_dir():
@@ -190,6 +214,7 @@ def initialize(source, home, project):
     git_root = git(project, "rev-parse", "--show-toplevel")
     if git_root and Path(git_root).resolve() != project:
         raise RuntimeError("请在 Git 仓库根目录执行 agentdev init，避免创建嵌套工作区")
+    source_repository = is_source_repository(project)
     py = home / "venv" / "bin/python"
     errors = runtime_errors(py, source)
     if errors:
@@ -233,11 +258,13 @@ def initialize(source, home, project):
     (env / "last-update").write_text(f"{int(time.time())}\n", encoding="utf-8")
     managed = load_json(env / "managed-links.json")
     agents = project / "AGENTS.md"
-    if agents.is_file() and not agents.is_symlink() and str(agents) not in managed:
-        text = re.sub(r"<!-- agentskill:begin[^\n]*-->.*?" + re.escape(MARK_END), "", agents.read_text(encoding="utf-8"), flags=re.S).rstrip()
-        write_if_changed(agents, text + "\n\n" + MARK_BEGIN + "\n\n" + (source / "AGENTS.md").read_text(encoding="utf-8").rstrip() + "\n" + MARK_END + "\n")
-    else:
-        link_or_copy(agents, source / "AGENTS.md", managed)
+    # 主仓库自己的规则是模板源，不能再追加模板或替换为安装目录链接。
+    if not source_repository:
+        if agents.is_file() and not agents.is_symlink() and str(agents) not in managed:
+            text = re.sub(r"<!-- agentskill:begin[^\n]*-->.*?" + re.escape(MARK_END), "", agents.read_text(encoding="utf-8"), flags=re.S).rstrip()
+            write_if_changed(agents, text + "\n\n" + MARK_BEGIN + "\n\n" + (source / "AGENTS.md").read_text(encoding="utf-8").rstrip() + "\n" + MARK_END + "\n")
+        else:
+            link_or_copy(agents, source / "AGENTS.md", managed)
     link_or_copy(project / "CLAUDE.md", agents, managed)
     for name in sorted({path.name for directory in (common, ws / "skills/custom") for path in directory.iterdir() if path.is_dir()}):
         target = ws / "skills/custom" / name
@@ -245,7 +272,8 @@ def initialize(source, home, project):
             target = common / name
         link_or_copy(project / ".claude/skills" / name, target, managed)
     write_if_changed(env / "managed-links.json", json.dumps(managed, indent=2, ensure_ascii=False) + "\n")
-    append_lines(project / ".gitignore", ["/agent-workspace/config/", "/agent-workspace/.agent/", "/agent-workspace/.agent/tmp/", "/agent-workspace/*/specs/"])
+    if not source_repository:
+        append_lines(project / ".gitignore", ["/agent-workspace/config/", "/agent-workspace/.agent/", "/agent-workspace/.agent/tmp/", "/agent-workspace/*/specs/"])
     if git_root:
         exclude = Path(git(project, "rev-parse", "--git-path", "info/exclude"))
         exclude = exclude if exclude.is_absolute() else project / exclude

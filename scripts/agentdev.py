@@ -13,12 +13,11 @@ import sys
 import tempfile
 
 sys.dont_write_bytecode = True
-from workspace import initialize, check_workspace, fix_notes, requirements, runtime_errors
+from workspace import REPOSITORY, initialize, check_workspace, fix_notes, requirements, runtime_errors
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "skills"))
 from _version import parse_version, format_version, read_version_file, fetch_remote_version
-REPOSITORY = "https://github.com/LumenVestige/AgentDevWorkSpace.git"
 ALIASES = {
     "-help": "help", "--h": "help", "--help": "help", "-h": "help",
     "-setup": "setup", "--s": "setup", "-init": "init", "--i": "init",
