@@ -1,7 +1,7 @@
 #!/bin/sh
 # 用法：sh <AgentDevWorkSpace 路径>/setup.sh [项目根目录]（根目录的 setup.sh 是指向本文件的软链接）
 # 接入 AgentDevWorkSpace：先执行 scripts/init.sh 初始化项目文件（AGENTS.md / CLAUDE.md 软链接、工作区 agent-workspace/
-#（含 skills 副本）、.claude/skills 软链接、.gitignore），再安装运行环境：提交校验 hook、Python 虚拟环境与依赖、Stop hook。可重复执行。
+#（含 skills 副本）、.claude/skills 软链接、.gitignore）和 scripts/fix.sh（升级兼容），再安装运行环境：提交校验 hook、Python 虚拟环境与依赖、Stop hook。可重复执行。
 # 项目根目录优先取参数，其次取执行命令的目录，最后取包含 AgentDevWorkSpace 的上层 git 仓库。
 # 非 git 工程须显式传入项目根目录：照常初始化，跳过 .git/info/exclude 和 commit-msg hook。
 set -e
@@ -14,10 +14,13 @@ cd "$project_root"
 git_env
 
 # 项目文件的初始化都在 init.sh 中。AgentDevWorkSpace 初始化自身时不接受显式根目录，在 AgentDevWorkSpace 目录内不带参数执行。
+# init.sh 之后执行 fix.sh，把旧版本留下的工作区文件改成新版本的格式（升级兼容）。
 if [ "$project_root" = "$skill_dir" ]; then
   sh "$skill_dir/scripts/init.sh"
+  sh "$skill_dir/scripts/fix.sh"
 else
   sh "$skill_dir/scripts/init.sh" "$project_root"
+  sh "$skill_dir/scripts/fix.sh" "$project_root"
 fi
 
 # hook 只转发到工作区 git-commit skill 中的脚本（agent-workspace/skills/common/，init.sh 每次覆盖）；不覆盖项目已有的其他 hook。
