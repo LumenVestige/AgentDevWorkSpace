@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查需求目录（agent-workspace/<个人目录>/<feature|bugfix|change>/NNN-<slug>/）中的文件是否已归类。
+"""检查需求目录（agent-workspace/<个人目录>/<feature|bugfix|change|research>/NNN-<slug>/）中的文件是否已归类。
 
 规则（见本目录 SKILL.md「需求目录内的文件」）：
 - 根目录只放 spec.md、plan.md、tasks.md、summary.md；
@@ -24,7 +24,7 @@ sys.dont_write_bytecode = True  # 不在工作区副本中生成 __pycache__
 BLOCK = 2  # Stop hook：退出码 2 阻止结束，stderr 交给 Agent
 ROOT_FILES = {"spec.md", "plan.md", "tasks.md", "summary.md"}
 SUBDIR = re.compile(r"^\d{2}-[^/]+$")
-TYPES = ("feature", "bugfix", "change")
+TYPES = ("feature", "bugfix", "change", "research")
 REQ_DIR = re.compile(r"^\d{3}-")
 JUNK = {".DS_Store", "Thumbs.db", "__pycache__", ".gitkeep"}
 

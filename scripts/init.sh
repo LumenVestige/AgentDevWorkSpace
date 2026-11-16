@@ -67,7 +67,7 @@ fi
 # - skills/common/：AgentDevWorkSpace 的 skills/ 是通用 skill 模板包，每次执行都整体覆盖到这里，不要在 common/ 中修改；
 #   skills/custom/：项目自己的 skill，从不改动；与 common/ 同名时优先加载 custom/ 中的。两者都随项目提交。
 # - <个人目录>/：specs/ 是个人的自定义约束（constraints.md，从 sdd skill 的 personal-constraints.md 复制，已有时不覆盖），
-#   写入 .gitignore，不提交；feature/、bugfix/、change/ 由 sdd skill 的 new_*.sh 按需创建；notes/ 存放 Note。
+#   写入 .gitignore，不提交；feature/、bugfix/、change/、research/ 由 sdd skill 的 new_*.sh 按需创建；notes/ 存放 Note。
 #   个人目录除 specs/ 外随项目提交。
 # - config/：配置（notes.json5）；.agent/：env/（Python 虚拟环境、脚本状态、AgentDevWorkSpace 路径）、tmp/（Agent 的临时文件）、
 #   profiles/、evals/。都是本机使用，写入 .gitignore，不提交；tmp/ 另单独写一行，.agent/ 的忽略规则被改动时临时文件仍不会被提交。

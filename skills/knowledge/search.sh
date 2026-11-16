@@ -1,6 +1,6 @@
 #!/bin/sh
 # 用法（在项目根目录执行）：sh agent-workspace/skills/common/knowledge/search.sh <关键词> [关键词…]
-# 在开发知识库中检索：所有人的 feature / bugfix / change 文档（含 NN-<主题>/ 子目录中的 .md）、Note、个人约束、通用约束，以及 git 提交信息。
+# 在开发知识库中检索：所有人的 feature / bugfix / change / research 文档（含 NN-<主题>/ 子目录中的 .md）、Note、个人约束、通用约束，以及 git 提交信息。
 # 多个关键词须同时出现在同一个文件（或同一条提交信息）中；不区分大小写，按字面匹配（不是正则）。
 # 每个命中的文件列出路径、所属需求的 spec 头部（类型、编号、负责人、状态）和最多 3 行命中内容。
 unset GIT_DIR GIT_WORK_TREE
@@ -62,6 +62,7 @@ W=agent-workspace
 search "功能 feature" $W/*/feature/*/*.md $W/*/feature/*/*/*.md
 search "bug 修复 bugfix" $W/*/bugfix/*/*.md $W/*/bugfix/*/*/*.md
 search "变更 change" $W/*/change/*/*.md $W/*/change/*/*/*.md
+search "调研 research" $W/*/research/*/*.md $W/*/research/*/*/*.md
 search "Note" $W/*/notes/*.md
 search "约束" $W/skills/custom/sdd/constraints.md $W/skills/common/sdd/constraints.md $W/*/specs/constraints.md
 
