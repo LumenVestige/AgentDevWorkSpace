@@ -76,7 +76,10 @@ class SourceWorkspaceTests(unittest.TestCase):
             self.assertEqual(home, self.home)
             shutil.copytree(checkout, self.source, dirs_exist_ok=True)
 
-        with mock.patch.object(agentdev, "run", side_effect=run), \
+        # This fixture mocks downloads/installations, not Git recovery (real Git is
+        # covered in test_repository); keep workspace protection independent of it.
+        with mock.patch.object(agentdev, "missing_repository", return_value=False), \
+                mock.patch.object(agentdev, "run", side_effect=run), \
                 mock.patch("lib.installer.run", side_effect=run), \
                 mock.patch.object(agentdev, "install", side_effect=install), \
                 mock.patch.object(agentdev.Path, "cwd", return_value=project):

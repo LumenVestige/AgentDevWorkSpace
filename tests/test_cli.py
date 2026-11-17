@@ -29,8 +29,14 @@ class GlobalCLI(unittest.TestCase):
         cls.home = cls.base / 'global 安装'
         cls.remote_version = cls.base / 'remote-version'
         cls.remote_version.write_text('0.3\n')
-        cls.env = isolated_env(cls.base)
+        cls.env = isolated_env(cls.base, GIT_ALLOW_PROTOCOL='file')
         cls.source = copy_source(cls.base / 'fixture source')
+        # Same-version update can now repair Git: use a real local master, never GitHub.
+        for args in (['init', '-q', '-b', 'master'], ['add', '.'],
+                     ['commit', '-qm', '[update] isolated CLI fixture'],
+                     ['remote', 'add', 'origin', str(cls.source)]):
+            subprocess.run(['git', '-C', str(cls.source), *args], env=cls.env, check=True,
+                           capture_output=True)
         result = subprocess.run(['sh', str(cls.source / 'setup.sh'), '--no-path'],
                                 cwd=cls.base, env=cls.env, capture_output=True, text=True, timeout=120)
         if result.returncode:

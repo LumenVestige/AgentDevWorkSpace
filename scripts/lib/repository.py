@@ -67,6 +67,13 @@ def mirror_worktree(source, staged):
             shutil.copy2(src, dst)
 
 
+def missing_repository(home):
+    """Only absent metadata is repairable; never replace an existing/symlinked Git."""
+    app = home / 'app'
+    metadata = app / '.git'
+    return app.is_dir() and not app.is_symlink() and not metadata.exists() and not metadata.is_symlink()
+
+
 def installation_risk(home):
     """Return (visible warning, block replacement); absence of a legacy Git is unknown."""
     app = home / 'app'
@@ -75,7 +82,9 @@ def installation_risk(home):
         metadata = json.loads((home / 'install.json').read_text(encoding='utf-8'))
         baseline = metadata.get('commit')
         if (app / '.git').is_symlink() or not (app / '.git').is_dir():
-            return prefix + '缺少独立 .git，无法检查本地改动；请备份并从 master 源码运行 setup.sh 重装。', bool(baseline)
+            if missing_repository(home):
+                return prefix + '缺少独立 .git，无法检查本地改动；可执行 agentdev update 补齐缺失的 .git。', bool(baseline)
+            return prefix + '.git 不是独立目录，无法检查本地改动；不会自动替换已有 Git 元数据。', True
         if Path(git(app, 'rev-parse', '--show-toplevel').strip()).resolve() != app.resolve():
             raise RuntimeError('安装目录不是独立仓库根目录')
         issues = []

@@ -3,9 +3,9 @@ import argparse
 from pathlib import Path
 import tempfile
 
-from lib.repository import warn_installation
+from lib.repository import warn_installation, missing_repository
 from lib.installer import (global_home, installed, installation_lock, read_version, remote_version,
-                           version, version_text, metadata, run, install, python_exe)
+                           version, version_text, metadata, run, install, python_exe, repair_repository)
 from lib.update_status import UpdateTask, update_lock, show_status
 
 
@@ -30,13 +30,16 @@ def update(home, check_only=False, project=None, remote=None, notify="auto"):
     if check_only:
         print("发现远端版本更新" if remote > local else "已是最新")
         return
-    if remote <= local:
+    # Legacy upgrades without a commit still use full-install migration; there is
+    # no trustworthy old commit to recover from a newer master.
+    repair = missing_repository(home) and (remote <= local or bool(metadata(home).get("commit")))
+    if remote <= local and not repair:
         print("已是最新")
         refresh(home, project)
         return
     task = UpdateTask(home, version_text(local), version_text(remote), notify, project)
     try:
-        if blocked:
+        if blocked and not repair:
             error = "安装目录存在风险，已暂停更新；请先备份并处理本地改动"
             task.finish("blocked", error)
             raise RuntimeError(error)
@@ -46,14 +49,24 @@ def update(home, check_only=False, project=None, remote=None, notify="auto"):
             checkout = Path(temporary) / "source"
             repo = metadata(home)["repository"]
             task.run(["git", "clone", "--depth", "1", "--single-branch", "--no-tags", "--branch", "master", repo, checkout], timeout=120)
-            if read_version(checkout) < remote:
+            if remote > local and read_version(checkout) < remote:
                 raise RuntimeError("远端源码尚未包含公布的版本，本次不更新，请稍后重试")
-            install(checkout, home, no_path=not metadata(home).get("path_configured", False), repo=repo, progress=task)
+            if repair:
+                task.stage("staging")
+                repair_repository(home, checkout)
+                print(".git 已补齐（master）；现有源码未覆盖", flush=True)
+                task.log(".git 已补齐（master）；现有源码未覆盖")
+                if warn_installation(home):
+                    error = "已补齐 .git，但安装目录存在异常改动，已暂停覆盖式更新"
+                    task.finish("blocked", error)
+                    raise RuntimeError(error)
+            if remote > local:
+                install(checkout, home, no_path=not metadata(home).get("path_configured", False), repo=repo, progress=task)
         task.stage("refreshing")
         refresh(home, project, task.run)
         task.value["to_version"] = version_text(read_version(home / "app"))
         task.finish("success")
-        print(f"已更新到 {task.value['to_version']}")
+        print(f"已更新到 {task.value['to_version']}" if remote > local else "已是最新；Git 元数据已修复")
     except BaseException as error:
         task.finish("failed", error)
         raise

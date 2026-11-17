@@ -260,3 +260,161 @@ class InstalledRepository(Sandbox):
         self.run_command([sys.executable, self.app / 'scripts/command/app.py', 'update'], cwd=self.app)
         self.assertEqual(snapshot(self.app), before)
         self.assertEqual(installation_risk(self.home), ('', False))
+
+    def test_same_version_update_repairs_missing_git_without_overwriting_source(self):
+        shutil.rmtree(self.app / '.git')
+        self.metadata.pop('commit')
+        (self.home / 'install.json').write_text(json.dumps(self.metadata))
+        before = snapshot(self.app)
+        result = self.cli('update')
+        self.assertIn('.git 已补齐', result.stdout)
+        self.assertEqual(snapshot(self.app), before)
+        self.assertEqual(installation_risk(self.home), ('', False))
+        self.assertEqual(self.git('branch', '--format=%(refname:short)', cwd=self.app), 'master')
+        self.assertFalse((self.app / '.git/objects/info/alternates').exists())
+        self.assertEqual(self.git('config', 'remote.origin.url', cwd=self.app), str(self.source))
+        status = json.loads((self.home / 'update-status.json').read_text())
+        self.assertEqual(status['result'], 'success')
+        self.assertEqual(status['from_version'], status['to_version'])
+        task_id = status['task_id']
+        self.cli('update')
+        self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['task_id'], task_id)
+        shutil.rmtree(self.source)
+        self.assertEqual(self.git('rev-parse', 'HEAD', cwd=self.app), self.commit)
+
+    def test_git_repair_uses_recorded_commit_not_newer_master(self):
+        shutil.rmtree(self.app / '.git')
+        before = snapshot(self.app)
+        self.commit_file(self.source, 'publish/version', '0.4.0\n')
+        result = self.cli('update')  # published version still 0.3.0
+        self.assertIn('.git 已补齐', result.stdout)
+        self.assertEqual(snapshot(self.app), before)
+        self.assertEqual(self.git('rev-parse', 'HEAD', cwd=self.app), self.commit)
+        self.assertEqual(installation_risk(self.home), ('', False))
+
+    def test_git_repair_preserves_and_reports_abnormal_changes(self):
+        (self.app / 'README.md').write_text('KEEP MANUAL EDIT')
+        (self.app / 'AGENTS.md').unlink()
+        (self.app / 'manual.txt').write_text('KEEP UNTRACKED')
+        for recorded in (True, False):
+            with self.subTest(recorded_commit=recorded):
+                shutil.rmtree(self.app / '.git')
+                if not recorded:
+                    self.metadata.pop('commit')
+                    (self.home / 'install.json').write_text(json.dumps(self.metadata))
+                before = snapshot(self.app)
+                result = self.cli('update', success=False)
+                self.assertIn('.git 已补齐', result.stdout)
+                self.assertIn('异常改动', result.stderr)
+                for name in ('README.md', 'AGENTS.md', 'manual.txt'):
+                    self.assertIn(name, result.stderr)
+                self.assertEqual(snapshot(self.app), before)
+                self.assertTrue(installation_risk(self.home)[1])
+                self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['result'], 'blocked')
+                self.assertFalse((self.home / 'app.previous').exists())
+                self.assertFalse((self.home / '.install.lock').exists())
+
+    def test_missing_git_version_and_check_remain_read_only(self):
+        shutil.rmtree(self.app / '.git')
+        before = snapshot(self.home)
+        for args in (('version',), ('update', '--check')):
+            with self.subTest(args=args):
+                result = self.cli(*args)
+                self.assertIn('agentdev update', result.stderr)
+                self.assertIn('缺少独立 .git', result.stderr)
+                self.assertFalse((self.app / '.git').exists())
+                self.assertEqual(snapshot(self.home), before)
+
+    def test_git_repair_refuses_unmatched_or_unavailable_baselines(self):
+        shutil.rmtree(self.app / '.git')
+        self.commit_file(self.source, 'publish/version', '0.4.0\n')
+        # No baseline, wrong version, unknown SHA, wrong-version SHA, invalid SHA.
+        for baseline in (None, 'f' * 40, self.git('rev-parse', 'HEAD', cwd=self.source), '--unsafe'):
+            with self.subTest(baseline=baseline):
+                self.metadata.pop('commit', None)
+                if baseline is not None:
+                    self.metadata['commit'] = baseline
+                (self.home / 'install.json').write_text(json.dumps(self.metadata))
+                before = snapshot(self.app)
+                metadata_before = (self.home / 'install.json').read_bytes()
+                self.cli('update', success=False)
+                self.assertFalse((self.app / '.git').exists())
+                self.assertEqual(snapshot(self.app), before)
+                self.assertEqual((self.home / 'install.json').read_bytes(), metadata_before)
+                self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['result'], 'failed')
+                self.assertFalse(list(self.home.glob('repair-git-*')))
+
+    def test_git_repair_download_failure_preserves_installation(self):
+        shutil.rmtree(self.app / '.git')
+        self.metadata['repository'] = str(self.base / 'does-not-exist')
+        (self.home / 'install.json').write_text(json.dumps(self.metadata))
+        before = snapshot(self.app)
+        self.cli('update', success=False)
+        self.assertEqual(snapshot(self.app), before)
+        self.assertFalse((self.app / '.git').exists())
+        self.assertEqual(json.loads((self.home / 'install.json').read_text()), self.metadata)
+        self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['result'], 'failed')
+
+    def test_git_repair_rolls_back_if_metadata_cannot_be_written(self):
+        from lib.installer import repair_repository
+        shutil.rmtree(self.app / '.git')
+        before = snapshot(self.home)
+        with patch('lib.update_status.atomic_json', side_effect=OSError('fixture write failure')):
+            with self.assertRaisesRegex(OSError, 'fixture write failure'):
+                repair_repository(self.home, self.source)
+        self.assertFalse((self.app / '.git').exists())
+        self.assertEqual(snapshot(self.home), before)
+        self.assertFalse(list(self.home.glob('repair-git-*')))
+
+    def test_git_repair_does_not_replace_existing_git(self):
+        from lib.installer import repair_repository
+        # Valid, corrupt directory, Git file and dangling symlink are never repair candidates.
+        for kind in ('valid', 'directory', 'file', 'symlink'):
+            with self.subTest(kind=kind):
+                path = self.app / '.git'
+                if kind != 'valid':
+                    if path.is_dir():
+                        shutil.rmtree(path)
+                    else:
+                        path.unlink()
+                    if kind == 'directory':
+                        path.mkdir()
+                    elif kind == 'file':
+                        path.write_text('gitdir: nonexistent\n')
+                    else:
+                        path.symlink_to(self.base / 'nonexistent')
+                before = snapshot(self.app)
+                with self.assertRaisesRegex(RuntimeError, '不替换已有 Git'):
+                    repair_repository(self.home, self.source)
+                self.assertEqual(snapshot(self.app), before)
+                if kind != 'valid':
+                    self.metadata.pop('commit', None)
+                    (self.home / 'install.json').write_text(json.dumps(self.metadata))
+                    self.assertTrue(installation_risk(self.home)[1])
+                    (self.base / 'remote-version').write_text('0.4.0')
+                    self.cli('update', success=False)
+                    self.assertEqual(snapshot(self.app), before)
+                    self.assertFalse((self.home / 'app.previous').exists())
+
+    def test_missing_git_with_recorded_baseline_can_upgrade_after_repair(self):
+        shutil.rmtree(self.app / '.git')
+        self.commit_file(self.source, 'publish/version', '0.4.0\n')
+        (self.base / 'remote-version').write_text('0.4.0')
+        self.run_command([sys.executable, '-m', 'venv', self.home / 'venv'])
+        result = self.cli('update')
+        self.assertIn('.git 已补齐', result.stdout)
+        self.assertIn('已更新到 0.4.0', result.stdout)
+        self.assertEqual(installation_risk(self.home), ('', False))
+        self.assertEqual((self.app / 'publish/version').read_text(), '0.4.0\n')
+
+    def test_missing_git_abnormal_changes_block_newer_version_upgrade(self):
+        shutil.rmtree(self.app / '.git')
+        self.commit_file(self.source, 'publish/version', '0.4.0\n')
+        (self.base / 'remote-version').write_text('0.4.0')
+        (self.app / 'README.md').write_text('KEEP')
+        before = snapshot(self.app)
+        result = self.cli('update', success=False)
+        self.assertIn('异常改动', result.stderr)
+        self.assertEqual(snapshot(self.app), before)
+        self.assertEqual(self.git('rev-parse', 'HEAD', cwd=self.app), self.commit)
+        self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['result'], 'blocked')

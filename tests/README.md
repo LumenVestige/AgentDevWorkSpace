@@ -29,7 +29,7 @@ AGENTDEV_TEST_WHEELS="$PWD/tests/workspace/wheels" \
   tests/workspace/venv/bin/python -B -m unittest discover -s tests -p 'test_*.py' -v
 ```
 
-缺依赖、初始化失败、断言失败都会返回非零退出码。默认运行全部 240 个测试方法，数据驱动的方法通过 `subTest` 覆盖多个输入。zsh 激活测试在主机没有 zsh 时显示 skip；bash 激活、fish 配置生成仍会执行。
+缺依赖、初始化失败、断言失败都会返回非零退出码。默认运行全部 250 个测试方法，数据驱动的方法通过 `subTest` 覆盖多个输入。zsh 激活测试在主机没有 zsh 时显示 skip；bash 激活、fish 配置生成仍会执行。
 
 ## 覆盖范围
 
@@ -38,7 +38,7 @@ AGENTDEV_TEST_WHEELS="$PWD/tests/workspace/wheels" \
 | `test_agentdev.py` | 5 | adev 别名、参数与退出码转发、shell 激活（不再重载 setup 环境）、重装后入口 |
 | `test_update_status.py` | 21 | 原子 JSON/完整字段/失败清理、通知路由/macOS 参数/Linux 超时/无桌面与 SSH 降级、真实 Git 升级、并发两项目一组通知且各自刷新、自动 hook 共用状态、只读查询/到期退出、失败及风险终态 |
 | `test_claude_plugin.py` | 2 | 插件清单与模块路径；通过 Node.js 执行官方 Mod API 替身验证后台轮询、完成 10 秒清除、新任务计时器隔离、损坏文件降级和会话清理（23 项 JS 断言，不是真实客户端 UI 验收） |
-| `test_repository.py` | 21 | 真实 master 独立安装、完整树与 dirty 源保留、忽略私有文件、暂存/未暂存/删除/未跟踪、HEAD/分支、Git 异常/超时、旧快照迁移、worktree/symlink、CLI 与欢迎语风险、阻止覆盖及只读性 |
+| `test_repository.py` | 31 | 真实 master 独立安装、完整树与 dirty 源保留、忽略私有文件、暂存/未暂存/删除/未跟踪、HEAD/分支、Git 异常/超时、旧快照迁移、worktree/symlink、CLI 与欢迎语风险、阻止覆盖及只读性；同版本补齐 .git、原 commit 恢复、异常保留阻断、错误基准拒绝、下载/元数据失败回滚、现有 Git 不替换、恢复后继续升级 |
 | `test_layout.py` | 7 | 移除 setup 及别名、帮助命令列表、command/lib 分层、旧 Python 入口转发 |
 | `test_version.py` | 10 | 每个接口独立 5 秒超时、API 限流与 HTTP/网络错误回退、响应内容校验 |
 | `test_workspace.py` | 16 | 源码工作区保护、AGENTS 文件引用与旧规则迁移、受管文件保留和刷新 |

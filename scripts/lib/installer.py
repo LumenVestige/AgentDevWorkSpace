@@ -13,7 +13,7 @@ import tempfile
 
 sys.dont_write_bytecode = True
 from .workspace import REPOSITORY, requirements, runtime_errors
-from .repository import stage_repository
+from .repository import stage_repository, missing_repository, git
 
 ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT / "skills"))
@@ -136,6 +136,40 @@ def configure_path(home):
         text = re.sub(re.escape(start) + r".*?" + re.escape(end), "", text, flags=re.S).rstrip()
         profile.parent.mkdir(parents=True, exist_ok=True)
         profile.write_text((text + "\n\n" if text else "") + block + "\n", encoding="utf-8")
+
+
+def repair_repository(home, checkout):
+    """Restore only Git metadata, never checkout/reset the installed worktree."""
+    from .update_status import atomic_json
+
+    if not missing_repository(home):
+        raise RuntimeError("仅允许补齐缺失的 .git，不替换已有 Git 元数据")
+    saved = metadata(home)
+    baseline = saved.get("commit")
+    if baseline and (not isinstance(baseline, str) or not re.fullmatch(r"[0-9a-fA-F]{40}|[0-9a-fA-F]{64}", baseline)):
+        raise RuntimeError("安装 commit 基准无效，无法补齐 .git")
+    with tempfile.TemporaryDirectory(prefix="repair-git-", dir=home) as temporary:
+        staged = Path(temporary) / "repository"
+        stage_repository(checkout, staged, saved["repository"])
+        if baseline and git(staged, "rev-parse", "HEAD").strip() != baseline:
+            # The downloaded master may be newer; compare against the installed commit,
+            # not today's files. All destructive Git operations stay in temporary storage.
+            git(staged, "fetch", "--depth", "1", "--no-tags", "origin", baseline, timeout=120)
+            git(staged, "reset", "--hard", baseline)
+        if read_version(staged) != read_version(home / "app"):
+            raise RuntimeError("Git 基准版本与安装版本不一致，无法安全补齐 .git；现有源码未覆盖")
+        commit = git(staged, "rev-parse", "HEAD").strip()
+        if not missing_repository(home):
+            raise RuntimeError("安装目录的 .git 已变化，本次不替换")
+        target = home / "app/.git"
+        os.replace(staged / ".git", target)
+        try:
+            atomic_json(home / "install.json", dict(saved, commit=commit))
+        except BaseException:
+            # No pre-existing Git was touched; rollback only the metadata we just added.
+            os.replace(target, staged / ".git")
+            raise
+    return commit
 
 
 def install(source, home, no_path=False, repo=None, progress=None):
