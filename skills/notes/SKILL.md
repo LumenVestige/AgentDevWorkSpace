@@ -67,7 +67,7 @@ agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/v
 - 后台进程使用 POSIX 会话分离与存活检查；全局程序使用安装级内核更新锁与安装互斥锁，多项目等待后复用已完成升级并刷新各自工作区。
 - 手动和自动更新原子写入安装根目录（app/ 外）的 update-status.json，记录任务、阶段、起止时间、版本、结果及独立 logs/update-<id>.log 路径；--check/无升级不覆盖状态。CLI 可用 agentdev update --status [--watch] 查看。
 - Claude Code 使用外置 plugins/claude-update Mod（需用户主动加载），底部进度空闲时每秒刷新，结束结果 10 秒后清除；Codex 使用 macOS osascript/Linux notify-send 系统开始/结束通知，缺少通知环境不会影响升级，系统通知时长受桌面策略控制。新注册 hook 通过 --client 明确传播调用客户端。
-- 欢迎语查询版本时同时检查受管理安装的 Git 状态：未提交文件、分支或 HEAD 偏移会显示风险并暂停自动覆盖，CLI 更新也有同样保护。无 .git 的旧快照提示无法检查，后续更新可迁移到独立 master 工作树；当前业务项目的修改不作为安装风险。
+- 欢迎语查询版本时同时检查受管理安装的 Git 状态：未提交文件、分支或 HEAD 偏移会显示风险并暂停自动覆盖；hook 的内部 --project 更新调用保留同样保护。手动 agentdev/adev update 会强制覆盖安装目录改动，同版本发现风险也重新安装；风险文案提示“执行[agentdev update]进行强制覆盖更新。”。agentdev check 只读检查安装改动并继续工作区检查，风险时返回非零，不查询远端。无 .git 的旧快照提示无法检查，后续更新可迁移到独立 master 工作树；当前业务项目的修改不作为安装风险。
 
 skill 运行时优先使用 `agent-workspace/.agent/env/python-path` 记录的共享解释器；旧项目本地 venv 为兼容回退。新项目保留 `venv/` 兼容链接。
 

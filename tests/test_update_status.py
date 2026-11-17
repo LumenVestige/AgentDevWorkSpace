@@ -307,7 +307,8 @@ class SharedUpdateIntegration(Sandbox):
         fakebin.mkdir()
         for name in ('notify-send', 'osascript'):
             script = fakebin / name
-            script.write_text("#!/bin/sh\nprintf '%s\\n' \"$*\" >> \"$AGENTDEV_TEST_NOTIFICATIONS\"\n")
+            # macOS passes a multiline AppleScript argument; count invocations, not argument lines.
+            script.write_text("#!/bin/sh\nprintf 'notification\\n' >> \"$AGENTDEV_TEST_NOTIFICATIONS\"\n")
             script.chmod(0o755)
         self.env.update(AGENTDEV_NOTIFY='system', DISPLAY='fixture',
                         PATH=str(fakebin) + os.pathsep + self.env.get('PATH', ''),

@@ -98,7 +98,7 @@ def installation_risk(home):
         if status:
             issues.append('存在异常改动：' + '; '.join(status.splitlines()[:5]))
         if issues:
-            return prefix + '；'.join(issues) + '。更新可能丢失这些改动。', True
+            return prefix + '；'.join(issues) + '。执行[agentdev update]进行强制覆盖更新。', True
         if not baseline:
             return prefix + '缺少安装 commit 基准，无法检查本地提交偏移；请从 master 源码运行 setup.sh 重装。', False
         return '', False

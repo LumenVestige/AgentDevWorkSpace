@@ -29,9 +29,9 @@ fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 
 | --- | --- | --- |
 | `agentdev help` | `agentdev --h` | 展示所有命令 |
 | `agentdev init [目录]` | `agentdev --i [目录]` | 初始化工作区，完成后自动检查环境；失败返回非零 |
-| `agentdev update` | `agentdev --u` | 检查版本，有新版时更新全局程序和当前工作区 |
+| `agentdev update` | `agentdev --u` | 检查版本，强制覆盖安装目录改动并刷新当前工作区 |
 | `agentdev version` | `agentdev --v` | 展示本地与远端版本；查询失败时明确报错 |
-| `agentdev check [目录]` | `agentdev --c [目录]` | 单独只读检查工作区和环境，不修复文件 |
+| `agentdev check [目录]` | `agentdev --c [目录]` | 只读检查安装目录改动、工作区和环境，不修复文件 |
 
 上表命令的旧单横线形式作为兼容别名保留。安装不属于 app 命令：`setup`、`-setup`、`--s` 已移除，请直接运行或 source 根目录的 `setup.sh`；帮助和示例使用上表规范。
 
@@ -55,9 +55,11 @@ setup 在 macOS/Linux 注册当前用户的 shell PATH（zsh 的 `.zshrc`，bash
 
 setup 从 Git 源码安装时要求当前分支为 master。安装目录保留完整 Git 工作树与独立 `.git`，仅克隆 master（浅克隆、无其他分支或标签），不依赖原源码/更新临时目录的对象。源码中尚未提交的受控文件改动和非忽略未跟踪文件会保留，不会伪造提交；被忽略的私有配置、环境不复制。使用带本地改动的源码安装，之后也会收到安装目录改动提示。
 
-`agentdev version`、`agentdev update`（含 `--check`）和欢迎语版本检查同时检测安装目录的已暂存/未暂存/删除/未跟踪文件，并将分支及 HEAD 与安装基准比较。异常会展示“异常改动”风险提示和文件名，不附带备份/git status 提示；即使远端版本查询失败，本地风险也会展示。标记文件与 Python 字节码不会导致正常安装误报，当前业务项目的改动不计入安装风险。
+`agentdev check`、`agentdev version`、`agentdev update`（含 `--check`）和欢迎语版本检查同时检测安装目录的已暂存/未暂存/删除/未跟踪文件，并将分支及 HEAD 与安装基准比较。异常会展示“异常改动”风险提示和文件名，以及“执行[agentdev update]进行强制覆盖更新。”；即使远端版本查询失败，本地风险也会展示。`check` 不查询远端，发现安装风险时返回非零，仍完成工作区和环境检查；尚未全局安装时只检查工作区。标记文件与 Python 字节码不会导致正常安装误报，当前业务项目的改动不计入安装风险。
 
-存在本地改动、HEAD/分支异常或 Git 状态无法检查时，实际覆盖式更新会暂停，欢迎语不启动后台覆盖；请先备份并处理改动，不会自动 reset/clean。旧安装或归档源码没有 `.git` 时明确提示“无法检查”，不是“目录干净”；执行 `agentdev update` 即使版本相同也会补齐独立的 master `.git`，仅恢复元数据，不覆盖现有源码。有安装 commit 时恢复原基准；没有 commit 时要求 master 与安装版本一致，否则拒绝附加错误基准。补齐后立即检查，已有修改、删除（包括旧快照遗漏的受控文件）和未跟踪文件仍会提示“异常改动”并暂停覆盖；已有 `.git` 文件、符号链接或损坏仓库不会被自动替换。无 commit 的旧快照在真正有新版时仍兼容原来的完整升级迁移，也可从 master 源码执行 setup.sh 重装。源码安装、重装是显式替换操作，应先备份原安装改动。
+手动执行 `agentdev update`（或 `adev update`）允许强制覆盖安装目录改动：同版本发现改动时也会从 master 下载、校验并重新安装，丢弃安装目录的修改、删除和未跟踪文件；干净的同版本安装仍只刷新工作区。自动更新继续保留风险保护，欢迎语发现风险时不启动后台覆盖，hook 的内部 `--project` 调用也不会覆盖风险安装。
+
+旧安装或归档源码没有 `.git` 时明确提示“无法检查”，不是“目录干净”；同版本先补齐独立的 master `.git`，安装干净时仅恢复元数据。有安装 commit 时恢复原基准；没有 commit 时要求 master 与安装版本一致，否则拒绝附加错误基准。补齐后发现异常改动，手动更新继续覆盖安装，自动更新暂停。元数据修复本身不替换已有 `.git`，手动强制重新安装可整体替换风险安装。无 commit 的旧快照在真正有新版时仍兼容原来的完整升级迁移，也可从 master 源码执行 setup.sh 重装。
 
 更新仍根据 `install.json` 记录的 Git 仓库和远端版本，临时克隆 master、验证版本后替换 `app/`，失败保留原程序和可重试状态。安装与更新使用全局互斥锁。保留项目的配置、custom skills、个人约束和 Note；旧项目本地 venv 不删除。在安装目录本身执行 update 不会把它初始化为业务项目。
 
@@ -69,7 +71,7 @@ setup 从 Git 源码安装时要求当前分支为 master。安装目录保留�
 - `schema_version=1`；记录 `task_id`、`pid`、`client`、`stage`、`started_at/updated_at/finished_at/expires_at`（Unix 秒）、`from_version/to_version`、`result`、`error/failed_stage`、`project` 与 `log_path`。结果为 `running/success/failed/blocked`。
 - 真实阶段包括安装目录检查、下载源码、安装依赖、运行环境验证、准备/切换安装、刷新工作区。CLI 输出阶段；Git/pip/init 的子进程输出保存在独立任务日志中。
 - 多项目同时触发会等待安装级锁；首个任务升级后，其他项目重新读取版本，仅刷新各自工作区，不重复下载、不生成另一组成功通知，也不覆盖刚完成的状态。
-- `--check` 不创建任务；无新版且无需补齐 `.git` 时也不创建任务，不覆盖之前的状态。同版本补齐 `.git` 复用相同的进度、日志及通知机制。风险阻止、版本获取失败、下载/安装/刷新失败有终态；实际覆盖保护和安装回滚保留。
+- `--check` 不创建任务；无新版、无需补齐 `.git` 且无需强制覆盖时也不创建任务，不覆盖之前的状态。同版本补齐 `.git` 或强制覆盖复用相同的进度、日志及通知机制。自动更新风险阻止、版本获取失败、下载/安装/刷新失败有终态；安装回滚保留。
 
 查询与控制：
 
@@ -151,8 +153,10 @@ AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
 要在输入任何消息前看到欢迎语，在已接入项目中用以下入口启动（支持原有 CLI 参数）：
 
 ```sh
-sh <AgentDevWorkSpace 路径>/scripts/command/codex.sh
+sh "${AGENTDEV_HOME:-$HOME/.agent-dev-workspace}/app/scripts/command/codex.sh"
 ```
+
+入口使用全局安装目录（macOS/Linux 相同）中的副本，随 `agentdev update` 更新；不要指向 clone 下来的源码目录，源码目录只用于安装，移动、删除或调整脚本位置后转发会失效。入口只按启动目录查找项目的 `agent-workspace/`，与自身位置无关。
 
 入口先查询并打印 AgentDevWorkSpace 的版本信息或更新提示，以及项目 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common）；发现新版本时在后台更新（notes skill 的 `update.py --welcome`），
 再用 `--no-alt-screen` 启动原生 Codex，保留终端中的欢迎语；不发送初始消息、不调用模型。
@@ -160,13 +164,25 @@ sh <AgentDevWorkSpace 路径>/scripts/command/codex.sh
 `--help`、`--version`、`exec` 等子命令、恢复会话及重定向输出直接转发，不打印欢迎语。
 支持从项目子目录启动和 `-C/--cd` 指定项目。此入口只处理进程启动，CLI 内部 `/clear` 仍由 hook 处理。
 
-如果希望仍直接输入 `codex`，可在自己的 zsh 配置中添加转发函数，把下面路径改为实际绝对路径：
+如果希望仍直接输入 `codex`，可自行添加转发函数。zsh（`~/.zshrc`）和 bash（Linux 的 `~/.bashrc`）：
 
 ```sh
-function codex {
-  sh '/绝对路径/AgentDevWorkSpace/scripts/command/codex.sh' "$@"
+codex() {
+  sh "${AGENTDEV_HOME:-$HOME/.agent-dev-workspace}/app/scripts/command/codex.sh" "$@"
 }
 ```
+
+fish（`~/.config/fish/functions/codex.fish`）：
+
+```fish
+function codex
+    set -l home $HOME/.agent-dev-workspace
+    set -q AGENTDEV_HOME; and set home $AGENTDEV_HOME
+    sh $home/app/scripts/command/codex.sh $argv
+end
+```
+
+安装时用 `AGENTDEV_HOME` 指定过其他目录、但平时 shell 中未设置该变量的，把默认路径改为实际安装目录。
 
 setup 只注册 agentdev 所需的 PATH，不会添加 codex 转发函数；移除该函数即可恢复原生命令。
 

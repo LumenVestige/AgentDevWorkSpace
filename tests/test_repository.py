@@ -68,6 +68,8 @@ class InstalledRepository(Sandbox):
                 self.assertIn('风险', text)
                 self.assertIn(path.name, text)
                 self.assertIn('异常改动', text)
+                self.assertIn('执行[agentdev update]进行强制覆盖更新。', text)
+                self.assertNotIn('更新可能丢失这些改动', text)
                 self.assertNotIn('未提交改动', text)
                 self.assertNotIn('git status', text)
                 self.assertEqual(snapshot(self.app), before)
@@ -125,15 +127,116 @@ class InstalledRepository(Sandbox):
         self.assertIn('风险', result.stderr)
         self.assertIn('manual.txt', result.stderr)
 
-    def test_update_does_not_overwrite_local_changes(self):
+    def test_automatic_update_does_not_overwrite_local_changes(self):
         (self.app / 'README.md').write_text('KEEP')
         (self.base / 'remote-version').write_text('0.4.0')
-        result = self.cli('update', success=False)
+        result = self.cli('update', '--project', self.base, success=False)
         self.assertIn('风险', result.stderr)
         self.assertIn('暂停', result.stderr)
         self.assertEqual((self.app / 'README.md').read_text(), 'KEEP')
         self.assertFalse((self.home / 'app.previous').exists())
         self.assertFalse((self.home / '.install.lock').exists())
+
+    def test_manual_same_version_update_overwrites_all_uncommitted_changes(self):
+        (self.app / 'README.md').write_text('DISCARD UNSTAGED')
+        (self.app / 'extra/tracked.txt').write_text('DISCARD STAGED')
+        self.git('add', 'extra/tracked.txt', cwd=self.app)
+        (self.app / 'AGENTS.md').unlink()
+        (self.app / 'manual.txt').write_text('DISCARD UNTRACKED')
+        result = self.cli('update')
+        self.assertIn('已更新到 0.3.0', result.stdout)
+        self.assertIn('执行[agentdev update]进行强制覆盖更新。', result.stderr)
+        self.assertEqual((self.app / 'README.md').read_bytes(), (self.source / 'README.md').read_bytes())
+        self.assertEqual((self.app / 'extra/tracked.txt').read_text(), 'FULL TREE')
+        self.assertTrue((self.app / 'AGENTS.md').is_file())
+        self.assertFalse((self.app / 'manual.txt').exists())
+        self.assertEqual(installation_risk(self.home), ('', False))
+        self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['result'], 'success')
+        self.assertFalse((self.home / 'app.previous').exists())
+
+    def test_manual_new_version_update_overwrites_local_changes(self):
+        (self.app / 'README.md').write_text('DISCARD')
+        self.commit_file(self.source, 'publish/version', '0.4.0\n')
+        (self.base / 'remote-version').write_text('0.4.0')
+        result = self.cli('update')
+        self.assertIn('已更新到 0.4.0', result.stdout)
+        self.assertEqual(installation_risk(self.home), ('', False))
+        self.assertEqual((self.app / 'README.md').read_bytes(), (self.source / 'README.md').read_bytes())
+
+    def test_manual_force_validates_version_before_replacement(self):
+        (self.app / 'README.md').write_text('KEEP')
+        (self.base / 'remote-version').write_text('0.4.0')
+        before = snapshot(self.app)
+        result = self.cli('update', success=False)
+        self.assertIn('远端源码尚未包含公布的版本', result.stderr)
+        self.assertEqual(snapshot(self.app), before)
+        self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['result'], 'failed')
+
+    def test_manual_same_version_force_rejects_older_checkout(self):
+        (self.app / 'README.md').write_text('KEEP')
+        self.commit_file(self.source, 'publish/version', '0.2.0\n')
+        before = snapshot(self.app)
+        self.cli('update', success=False)
+        self.assertEqual(snapshot(self.app), before)
+        self.assertEqual(json.loads((self.home / 'update-status.json').read_text())['result'], 'failed')
+
+    def test_manual_same_version_update_overwrites_changes_after_git_repair(self):
+        shutil.rmtree(self.app / '.git')
+        (self.app / 'README.md').write_text('DISCARD')
+        result = self.cli('update')
+        self.assertIn('.git 已补齐', result.stdout)
+        self.assertIn('已更新到 0.3.0', result.stdout)
+        self.assertEqual((self.app / 'README.md').read_bytes(), (self.source / 'README.md').read_bytes())
+        self.assertEqual(installation_risk(self.home), ('', False))
+
+    def test_check_reports_installation_changes_without_mutation(self):
+        self.run_command(['sh', self.source / 'setup.sh', '--no-path'])
+        project = self.base / 'check-project'
+        project.mkdir()
+        self.cli('init', project)
+        before = snapshot(self.home)
+        result = self.cli('check', project)
+        self.assertNotIn('风险提示', result.stderr)
+        self.assertIn('检查通过', result.stdout)
+        self.assertEqual(snapshot(self.home), before)
+        # check must not depend on remote version availability.
+        (self.base / 'remote-version').write_text('invalid')
+        for kind in ('modified', 'staged', 'deleted', 'untracked'):
+            with self.subTest(kind=kind):
+                path = self.app / ('manual.txt' if kind == 'untracked' else 'README.md')
+                if kind == 'deleted':
+                    path.unlink()
+                else:
+                    path.write_text('KEEP')
+                if kind == 'staged':
+                    self.git('add', 'README.md', cwd=self.app)
+                before = snapshot(self.home)
+                index = (self.app / '.git/index').read_bytes()
+                result = self.cli('check', project, success=False)
+                self.assertIn(path.name, result.stderr)
+                self.assertIn('执行[agentdev update]进行强制覆盖更新。', result.stderr)
+                self.assertIn('检查通过', result.stdout)
+                self.assertEqual(snapshot(self.home), before)
+                self.assertEqual((self.app / '.git/index').read_bytes(), index)
+                self.git('reset', '--hard', '-q', 'HEAD', cwd=self.app)
+                if kind == 'untracked':
+                    path.unlink()
+
+    def test_check_reports_risk_even_if_workspace_is_invalid(self):
+        (self.app / 'README.md').write_text('KEEP')
+        before = snapshot(self.home)
+        result = self.cli('check', self.base / 'missing-project', success=False)
+        self.assertIn('README.md', result.stderr)
+        self.assertIn('工作区缺少', result.stdout)
+        self.assertEqual(snapshot(self.home), before)
+
+    def test_check_missing_git_is_read_only(self):
+        shutil.rmtree(self.app / '.git')
+        before = snapshot(self.home)
+        result = self.cli('check', self.base / 'missing-project', success=False)
+        self.assertIn('缺少独立 .git', result.stderr)
+        self.assertFalse((self.app / '.git').exists())
+        self.assertEqual(snapshot(self.home), before)
 
     def test_stage_preserves_dirty_source_without_private_files_or_source_writes(self):
         (self.source / 'README.md').write_text('DIRTY SOURCE')
@@ -303,7 +406,7 @@ class InstalledRepository(Sandbox):
                     self.metadata.pop('commit')
                     (self.home / 'install.json').write_text(json.dumps(self.metadata))
                 before = snapshot(self.app)
-                result = self.cli('update', success=False)
+                result = self.cli('update', '--project', self.base, success=False)
                 self.assertIn('.git 已补齐', result.stdout)
                 self.assertIn('异常改动', result.stderr)
                 for name in ('README.md', 'AGENTS.md', 'manual.txt'):
@@ -392,7 +495,7 @@ class InstalledRepository(Sandbox):
                     (self.home / 'install.json').write_text(json.dumps(self.metadata))
                     self.assertTrue(installation_risk(self.home)[1])
                     (self.base / 'remote-version').write_text('0.4.0')
-                    self.cli('update', success=False)
+                    self.cli('update', '--project', self.base, success=False)
                     self.assertEqual(snapshot(self.app), before)
                     self.assertFalse((self.home / 'app.previous').exists())
 
@@ -413,7 +516,7 @@ class InstalledRepository(Sandbox):
         (self.base / 'remote-version').write_text('0.4.0')
         (self.app / 'README.md').write_text('KEEP')
         before = snapshot(self.app)
-        result = self.cli('update', success=False)
+        result = self.cli('update', '--project', self.base, success=False)
         self.assertIn('异常改动', result.stderr)
         self.assertEqual(snapshot(self.app), before)
         self.assertEqual(self.git('rev-parse', 'HEAD', cwd=self.app), self.commit)
