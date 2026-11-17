@@ -5,7 +5,6 @@
 ## 安装与接入
 
 需要 Git 和 Python 3.9+。安装程序默认写入用户主目录的 `.agent-dev-workspace/`，不需要管理员权限；安装与项目初始化分开。
-
 macOS / Linux（bash / zsh）：
 
 ```sh
