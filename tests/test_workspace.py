@@ -15,8 +15,8 @@ from support import isolated_env
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import agentdev
-import workspace
+from command import update as agentdev
+from lib import workspace
 
 class SourceWorkspaceTests(unittest.TestCase):
     def setUp(self):
@@ -49,7 +49,7 @@ class SourceWorkspaceTests(unittest.TestCase):
         subprocess.run(["git", "-c", "init.templateDir=", "init", "-q", str(project)], check=True)
         (project / "agent-workspace").mkdir()
         if source:
-            self.remote(project, "add", "origin", agentdev.REPOSITORY)
+            self.remote(project, "add", "origin", workspace.REPOSITORY)
         (project / "AGENTS.md").write_bytes(b"# Local rules\r\nKeep these exact bytes.")
         (project / ".gitignore").write_bytes(b"# Local ignores\r\n/keep-me")
         return project
@@ -68,7 +68,7 @@ class SourceWorkspaceTests(unittest.TestCase):
                 shutil.copytree(self.source, checkout)
                 (checkout / "publish/version").write_text(agentdev.version_text(remote) + "\n")
             else:
-                self.assertEqual(args[1:3], [self.source / "scripts/agentdev.py", "init"])
+                self.assertEqual(args[1:3], [self.source / "scripts/command/app.py", "init"])
                 self.assertEqual(Path(args[-1]), project)
                 workspace.initialize(self.source, self.home, Path(args[-1]))
 
@@ -77,6 +77,7 @@ class SourceWorkspaceTests(unittest.TestCase):
             shutil.copytree(checkout, self.source, dirs_exist_ok=True)
 
         with mock.patch.object(agentdev, "run", side_effect=run), \
+                mock.patch("lib.installer.run", side_effect=run), \
                 mock.patch.object(agentdev, "install", side_effect=install), \
                 mock.patch.object(agentdev.Path, "cwd", return_value=project):
             agentdev.update(self.home, project=None if current_directory else str(project), remote=remote)
@@ -259,7 +260,7 @@ class SourceWorkspaceTests(unittest.TestCase):
         project = self.project()
         self.remote(project, "set-url", "origin", "https://github.com/someone/AgentDevWorkSpace.git")
         self.assertFalse(workspace.is_source_repository(project))
-        self.remote(project, "add", "upstream", agentdev.REPOSITORY)
+        self.remote(project, "add", "upstream", workspace.REPOSITORY)
         self.assertTrue(workspace.is_source_repository(project))
         self.remote(project, "remove", "origin")
         self.assertTrue(workspace.is_source_repository(project))

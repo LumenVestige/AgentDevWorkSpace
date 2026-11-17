@@ -76,7 +76,7 @@ def render_table(rows, columns, color):
 
 
 def render_version(line, color):
-    failed = any(word in line for word in ("失败", "找不到"))
+    failed = any(word in line for word in ("失败", "找不到", "风险"))
     code = "31" if failed else "32" if "已是最新" in line else "33"
     icon = "⚠" if failed else "✅" if "已是最新" in line else "🔄"
     match = re.fullmatch(r"AgentDevWorkSpace 版本：本地 (.+)，远端 (.+)（(.+)）", line)
@@ -95,7 +95,7 @@ def render_welcome(text, version="", color=False, columns=80):
         while lines and not lines[0].strip():
             lines.pop(0)
     if version:
-        output.append(render_version(version, color))
+        output.extend(render_version(line, color) for line in version.splitlines())
     index = 0
     while index < len(lines):
         line = lines[index]

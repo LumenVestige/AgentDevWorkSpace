@@ -4,7 +4,7 @@ import os
 from unittest.mock import patch
 
 from support import Sandbox, snapshot
-import workspace
+from lib import workspace
 
 
 class Notes(Sandbox):

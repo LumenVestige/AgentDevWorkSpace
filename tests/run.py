@@ -9,7 +9,7 @@ import venv
 
 sys.dont_write_bytecode = True
 from support import ROOT, WORK, isolated_env
-from workspace import requirements
+from lib.workspace import requirements
 
 
 def main():

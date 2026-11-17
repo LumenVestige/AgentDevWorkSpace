@@ -33,9 +33,9 @@ def slug(name):
 
 
 def requirements(source):
-    match = re.search(r'^deps="([^"]+)"$', (source / "scripts/deps.sh").read_text(encoding="utf-8"), re.M)
+    match = re.search(r'^deps="([^"]+)"$', (source / "scripts/lib/deps.sh").read_text(encoding="utf-8"), re.M)
     if not match:
-        raise RuntimeError("无法读取依赖清单 scripts/deps.sh")
+        raise RuntimeError("无法读取依赖清单 scripts/lib/deps.sh")
     return shlex.split(match.group(1))
 
 
@@ -45,7 +45,7 @@ def project_settings(project, py=None, source=None, migrate=False):
         pointer = env / "python-path"
         legacy = env / "venv" / "bin/python"
         py = Path(pointer.read_text(encoding="utf-8").strip()) if pointer.is_file() else legacy if legacy.is_file() else Path(sys.executable)
-    source = source or Path(__file__).resolve().parents[1]
+    source = source or Path(__file__).resolve().parents[2]
     result = subprocess.run([str(py), "-B", str(source / "skills/_workspace_config.py"), str(project), *(["--migrate"] if migrate else [])],
                             capture_output=True, text=True, timeout=20)
     if result.returncode:
@@ -63,7 +63,7 @@ def runtime_errors(py, source):
     try:
         result = subprocess.run([str(py), "-B", "-c", code, *requirements(source)], env=env, capture_output=True, text=True, timeout=20)
         if result.returncode:
-            return ["Python 无法运行或缺少依赖，请重新执行 agentdev setup"]
+            return ["Python 无法运行或缺少依赖，请重新执行 source setup.sh"]
         data = json.loads(result.stdout)
         errors = []
         if data["version"] < [3, 9]:
@@ -174,8 +174,10 @@ def load_json(path):
     return value
 
 
-def hook_command(py, source, project, script):
-    args = [str(py), "-B", str(source / "scripts/run_skill.py"), "--agentdev", "--project", str(project), script]
+def hook_command(py, source, project, script, client=None):
+    args = [str(py), "-B", str(source / "scripts/lib/run_skill.py"), "--agentdev", "--project", str(project), script]
+    if client:
+        args[4:4] = ["--client", client]
     return shlex.join(args)
 
 
@@ -193,7 +195,7 @@ def register_hooks(path, cfg, py, source, project):
                 kept.append({**entry, "hooks": hooks})
         for script in scripts:
             kept.append({**({"matcher": "startup|clear"} if event == "SessionStart" else {}),
-                         "hooks": [{"type": "command", "command": hook_command(py, source, project, script)}]})
+                         "hooks": [{"type": "command", "command": hook_command(py, source, project, script, "claude" if path.parent.name == ".claude" else "codex")}]})
         events[event] = kept
     write_if_changed(path, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
 
@@ -333,7 +335,7 @@ def check_workspace(project):
     if pointer.is_file():
         source = Path(pointer.read_text(encoding="utf-8").strip())
         py = Path(interpreter.read_text(encoding="utf-8").strip()) if interpreter.is_file() else ws / ".agent/env/venv" / "bin/python"
-        if (source / "scripts/deps.sh").is_file():
+        if (source / "scripts/lib/deps.sh").is_file():
             errors.extend(runtime_errors(py, source))
             if not errors:
                 if not any((ws / "config" / name).is_file() for name in ("config.json5", "notes.json5")):

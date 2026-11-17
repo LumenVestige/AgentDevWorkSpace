@@ -15,7 +15,7 @@ description: 写 Note（改动记录）。完成改变行为、架构、接口�
 - 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不迁移已有目录；
 - 日期目录和文件名中的时间取创建时刻，文件名不再包含年月日；topic 用小写字母、数字加 `-`；
 - 例如 `agent-workspace/tony/notes/git-commit-change/2026-08-25/14-30-05-local-cli-status-restart.md`；
-- 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由 setup 时执行的 `scripts/fix.sh` 移到 `git-commit-change/<YYYY-MM-DD>/`。
+- 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由 init 时调用的 `scripts/lib/workspace.py` 中 `fix_notes()` 移到 `git-commit-change/<YYYY-MM-DD>/`。
 
 ## 创建
 
@@ -58,13 +58,16 @@ agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/v
 
 ## 自动更新
 
-仅支持 macOS/Linux。全局安装使用 `agentdev setup`，项目初始化使用 `agentdev init`；实际更新拆到 `update.sh`，与 `agentdev update` 共用跨平台核心。
+仅支持 macOS/Linux。全局安装使用 `source setup.sh`，项目初始化使用 `agentdev init`；实际更新拆到 `update.sh`，与 `agentdev update` 共用跨平台核心。
 
 - `update.py` 只负责欢迎语/Stop hook 的版本查询、后台触发、项目锁和日志；不再执行全局 setup 或在项目副本中 git pull。
 - 欢迎语 `--welcome` 每次检查，Stop 按 `auto_update_interval_hours` 到期检查；已有远端版本传给后台进程，避免重复查询。版本查询默认按 API → Raw 回退，每个接口独立超时 5 秒，不平分超时。
 - 后台通过全局程序更新安装目录，并重新初始化当前工作区，保留 custom、个人约束和 Note。失败记录 update-ready，之后重试。
 - 版本使用大版本.小版本.补丁版本的整数三元组比较，例如 0.9.10 > 0.9.2；兼容读取旧一、两段版本并补齐三段。唯一版本源是主仓库 master 的 publish/version，旧配置地址自动映射，init 会保留注释并迁移。发现更新时提示“发现远端版本更新，由本地0.3.0版本更新到0.3.1版本”。
-- 后台进程使用 POSIX 会话分离与存活检查；全局程序另有安装/更新互斥锁。
+- 后台进程使用 POSIX 会话分离与存活检查；全局程序使用安装级内核更新锁与安装互斥锁，多项目等待后复用已完成升级并刷新各自工作区。
+- 手动和自动更新原子写入安装根目录（app/ 外）的 update-status.json，记录任务、阶段、起止时间、版本、结果及独立 logs/update-<id>.log 路径；--check/无升级不覆盖状态。CLI 可用 agentdev update --status [--watch] 查看。
+- Claude Code 使用外置 plugins/claude-update Mod（需用户主动加载），底部进度空闲时每秒刷新，结束结果 10 秒后清除；Codex 使用 macOS osascript/Linux notify-send 系统开始/结束通知，缺少通知环境不会影响升级，系统通知时长受桌面策略控制。新注册 hook 通过 --client 明确传播调用客户端。
+- 欢迎语查询版本时同时检查受管理安装的 Git 状态：未提交文件、分支或 HEAD 偏移会显示风险并暂停自动覆盖，CLI 更新也有同样保护。无 .git 的旧快照提示无法检查，后续更新可迁移到独立 master 工作树；当前业务项目的修改不作为安装风险。
 
 skill 运行时优先使用 `agent-workspace/.agent/env/python-path` 记录的共享解释器；旧项目本地 venv 为兼容回退。新项目保留 `venv/` 兼容链接。
 

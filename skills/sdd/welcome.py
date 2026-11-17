@@ -4,7 +4,7 @@
 输出 JSON：systemMessage 供客户端展示，首行是 AgentDevWorkSpace 的本地和远端版本号；additionalContext 交给 Agent，说明快捷命令的处理方式。
 版本行由 notes skill 的 `update.py --welcome` 生成：当场请求远端版本，本地落后时立即在后台更新（不等待）；
 update.py 不可用时只显示本地版本（agentskill-path 指向的 AgentDevWorkSpace 中的 publish/version）。
-Codex CLI 输入前的欢迎语由 scripts/codex.sh 启动入口打印，不要求 Agent 在首次回复复述。
+Codex CLI 输入前的欢迎语由 scripts/command/codex.sh 启动入口打印，不要求 Agent 在首次回复复述。
 读不到 welcome.md 时不输出，不影响会话。
 """
 import json

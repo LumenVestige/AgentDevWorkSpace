@@ -17,8 +17,8 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 sys.path.insert(0, str(ROOT / 'skills'))
 import _workspace_config as naming
 import _version as semver
-import agentdev
-import workspace
+from lib import installer as agentdev
+from lib import workspace
 
 
 class GlobalCLI(unittest.TestCase):
@@ -36,7 +36,7 @@ class GlobalCLI(unittest.TestCase):
         if result.returncode:
             raise RuntimeError(result.stdout + result.stderr)
         cls.py = agentdev.python_exe(cls.home)
-        cls.entry = cls.home / 'app/scripts/agentdev.py'
+        cls.entry = cls.home / 'app/scripts/command/app.py'
 
     @classmethod
     def tearDownClass(cls):
@@ -64,8 +64,19 @@ class GlobalCLI(unittest.TestCase):
     def test_default_help_and_aliases(self):
         for args in ((), ('-help',), ('--h',), ('--help',), ('-h',), ('help',)):
             text = self.invoke(*args).stdout
-            for command in ('setup', 'init', 'update', 'check', 'version'):
+            for command in ('init', 'update', 'check', 'version'):
                 self.assertIn(command, text)
+
+    def test_installed_commands_reject_setup_and_aliases_without_writes(self):
+        before = snapshot(self.home)
+        for name in ('agentdev', 'adev'):
+            for command in ('setup', '-setup', '--s'):
+                with self.subTest(name=name, command=command):
+                    result = subprocess.run([str(self.home / 'bin' / name), command], cwd=self.base,
+                                            env=self.env, capture_output=True, text=True, timeout=20)
+                    self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+        self.assertEqual(snapshot(self.home), before)
+        self.assertIn('scripts/command/app.py', (self.home / 'bin/agentdev').read_text())
 
     def test_version_aliases(self):
         for alias in ('version', '-version', '--v', '--version', '-v'):
@@ -75,7 +86,7 @@ class GlobalCLI(unittest.TestCase):
 
     def test_launchers(self):
         text = subprocess.run([str(self.home / 'bin/agentdev'), '--h'], env=self.env, capture_output=True, text=True, check=True).stdout
-        self.assertIn('setup', text)
+        self.assertNotIn('setup', text)
         self.assertFalse((self.home / 'bin/agentdev.cmd').exists())
         self.assertFalse((self.home / 'bin/agentdev.ps1').exists())
         self.assertTrue((self.home / 'app/skills/sdd/render_welcome.py').is_file())
@@ -209,9 +220,9 @@ class GlobalCLI(unittest.TestCase):
         self.assertFalse((root / 'agent-workspace').exists())
 
     def test_reinstall(self):
-        self.invoke('-setup', '--no-path')
-        self.invoke('--s', '--no-path')
-        self.assertTrue((self.home / 'app/scripts/run_skill.py').is_file())
+        self.run_install_for_update()
+        self.run_install_for_update()
+        self.assertTrue((self.home / 'app/scripts/lib/run_skill.py').is_file())
         self.assertFalse((self.home / '.install.lock').exists())
 
     def test_python_pointer_and_real_updater(self):
@@ -271,7 +282,7 @@ class GlobalCLI(unittest.TestCase):
         self.env = {**self.env, 'AGENTDEV_HOME': str(self.home)}
         self.run_install_for_update()
         self.py = agentdev.python_exe(self.home)
-        self.entry = self.home / 'app/scripts/agentdev.py'
+        self.entry = self.home / 'app/scripts/command/app.py'
         source = self.base / 'remote-source'
         shutil.copytree(self.home / 'app', source)
         (source / 'publish/version').write_text('0.4.0\n')
@@ -440,7 +451,7 @@ class GlobalCLI(unittest.TestCase):
         for relative in ('bin/agentdev.cmd','bin/agentdev.ps1','env.cmd','env.ps1'):
             path = self.home / relative
             path.write_text('old managed launcher')
-        self.invoke('setup', '--no-path')
+        self.run_install_for_update()
         for relative in ('bin/agentdev.cmd','bin/agentdev.ps1','env.cmd','env.ps1'):
             self.assertFalse((self.home / relative).exists())
 

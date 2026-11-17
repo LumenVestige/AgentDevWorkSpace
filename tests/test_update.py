@@ -140,6 +140,16 @@ class BackgroundUpdate(Sandbox):
             self.module.check(self.root, self.config, remote=(0, 3, 10))
         self.assertFalse(self.module.READY.exists())
 
+    def test_remote_lookup_failure_is_delegated_to_shared_cli_task(self):
+        cfg = {**self.config, 'update_url': (self.base / 'missing-version').as_uri()}
+        with patch.object(self.module, 'fetch_remote') as fetch, \
+                patch.object(self.module.subprocess, 'run', return_value=Mock(returncode=1)) as run:
+            self.module.check(self.root, cfg)
+        fetch.assert_not_called()
+        self.assertNotIn('--remote', run.call_args.args[0])
+        self.assertEqual(run.call_args.kwargs['env']['AGENTDEV_VERSION_URL'], cfg['update_url'])
+        self.assertEqual(self.module.READY.read_text().strip(), 'retry')
+
     def test_successful_init_retry_clears_ready(self):
         self.module.READY.write_text("0.3.1")
         with patch.object(self.module.subprocess, "run", return_value=Mock(returncode=1)):

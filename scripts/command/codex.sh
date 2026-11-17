@@ -4,6 +4,7 @@
 # Codex 未信任项目时项目级 SessionStart hook 不会加载，这里保证展示欢迎语时也会检查。update.py 不可用时只显示本地版本。
 # shell 函数可转发到本脚本；本脚本不安装全局命令，也不更改原生 CLI。
 set -e
+export AGENTDEV_CLIENT=codex
 
 launch_dir=$PWD
 interactive=1

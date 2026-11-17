@@ -24,7 +24,7 @@ description: Spec-Driven Development 流程。用户输入「创建feature:<名�
 - 创建后告诉用户目录的路径，然后从下面流程的第 0 步开始。
 
 每次新对话开始或 `/clear` 时，SessionStart hook 输出这些快捷命令（`welcome.md`），显示时机取决于客户端。
-Codex CLI 要在输入首条消息前展示欢迎语，使用 AgentDevWorkSpace 的 `scripts/codex.sh` 启动入口（见 README）；
+Codex CLI 要在输入首条消息前展示欢迎语，使用 AgentDevWorkSpace 的 `scripts/command/codex.sh` 启动入口（见 README）；
 不要让 Agent 在首次回复复述欢迎语。该入口在进程启动时打印，不接管 CLI 内部的 `/clear`。
 
 ## 约束

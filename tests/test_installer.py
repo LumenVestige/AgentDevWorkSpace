@@ -7,7 +7,8 @@ import sys
 from unittest.mock import Mock, patch
 
 from support import Sandbox, ROOT, copy_source, snapshot
-import agentdev
+from lib import installer as agentdev
+from command import update as updater
 
 
 class Installer(Sandbox):
@@ -92,7 +93,7 @@ class Installer(Sandbox):
         before = snapshot(self.home / "app")
         with patch.dict(os.environ, self.env, clear=True):
             with self.assertRaisesRegex(RuntimeError, "尚未包含公布的版本"):
-                agentdev.update(self.home, remote=(0, 3, 0))
+                updater.update(self.home, remote=(0, 3, 0))
         self.assertEqual(before, snapshot(self.home / "app"))
 
     def test_bash_profiles_keep_user_content_and_replace_managed_block(self):

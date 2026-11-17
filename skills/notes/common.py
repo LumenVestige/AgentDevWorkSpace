@@ -22,7 +22,7 @@ ENV = ROOT / "agent-workspace" / ".agent" / "env"
 try:
     import json5
 except ImportError:
-    sys.exit(f"缺少依赖 json5：请执行 agentdev setup 和 agentdev init，并使用 {ENV / 'python-path'} 记录的解释器运行")
+    sys.exit(f"缺少依赖 json5：请执行 source setup.sh 和 agentdev init，并使用 {ENV / 'python-path'} 记录的解释器运行")
 
 # hook 环境会导出 GIT_DIR，影响 git -C 的结果。
 for var in ("GIT_DIR", "GIT_WORK_TREE"):

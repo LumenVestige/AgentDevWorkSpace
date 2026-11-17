@@ -8,7 +8,7 @@
 
 ## agent-workspace/ 目录
 
-项目根目录下的 `agent-workspace/` 是 Agent 工作区，由 `scripts/init.sh` 创建，AgentDevWorkSpace 的文件都放在这里：
+项目根目录下的 `agent-workspace/` 是 Agent 工作区，由 `scripts/command/init.sh` 创建，AgentDevWorkSpace 的文件都放在这里：
 
 - `skills/`：Agent 加载的 skill，随项目提交；
   - `common/`：从 AgentDevWorkSpace 的 `skills/`（通用 skill 模板包）复制，每次执行 setup 都整体覆盖，不要在这里修改；
@@ -19,7 +19,7 @@
   - `notes/`：Note 记录（见 `notes` skill），按类型分 `git-commit-change/`、`large-scale-file-change/`，其下按 `YYYY-MM-DD/` 归档；只改动各人 `notes/` 的提交不会触发新的 Note；
 - `config/`：配置，`config.json5` 见 `notes` skill；不提交；
 - `.agent/`：本机使用，不提交；
-  - `env/`：`python-path` 记录全局安装的共享 Python 环境，skill 中的 Python 脚本用该解释器运行；macOS/Linux 的新项目保留 `venv/` 兼容链接，旧本地环境不删除；另有 Note 校验状态和 AgentDevWorkSpace 路径。全局安装由 `agentdev setup` 完成，项目接入用 `agentdev init`；
+  - `env/`：`python-path` 记录全局安装的共享 Python 环境，skill 中的 Python 脚本用该解释器运行；macOS/Linux 的新项目保留 `venv/` 兼容链接，旧本地环境不删除；另有 Note 校验状态和 AgentDevWorkSpace 路径。全局安装由根目录 `setup.sh` 完成，项目接入用 `agentdev init`；
   - `tmp/`：Agent 的临时文件（中间结果、一次性脚本、抓取的日志和截图等），按任务建子目录 `tmp/<主题>/`；不要在项目根目录或其他位置新建 `.agents/`、`tmp/` 之类的临时目录；已写入 `.gitignore`，不提交，需要留作证据的内容整理后放进对应需求目录；
   - `profiles/`、`evals/`：预留。
 

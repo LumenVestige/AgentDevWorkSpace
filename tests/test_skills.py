@@ -107,18 +107,18 @@ class SDD(Sandbox):
             target.write_text(f'import os\nprint({flavor!r}, os.getcwd())\n')
         child = self.root / "nested dir"
         child.mkdir()
-        result = self.run_command([sys.executable, ROOT / "scripts/run_skill.py", "--project", self.base,
+        result = self.run_command([sys.executable, ROOT / "scripts/lib/run_skill.py", "--project", self.base,
                                    "fixture/run.py"], cwd=child)
         self.assertEqual(result.stdout.strip(), f"custom {self.root}")
         (self.root / "agent-workspace/skills/custom/fixture/run.py").unlink()
-        result = self.run_command([sys.executable, ROOT / "scripts/run_skill.py", "--project", self.root,
+        result = self.run_command([sys.executable, ROOT / "scripts/lib/run_skill.py", "--project", self.root,
                                    "fixture/run.py"], cwd=child)
         self.assertEqual(result.stdout.strip(), f"common {self.root}")
 
     def test_hook_runner_rejects_parent_traversal(self):
         for script in ("../secret.py", "sdd/../../secret.py", "script.py"):
             with self.subTest(script=script):
-                result = self.run_command([sys.executable, ROOT / "scripts/run_skill.py", "--project", self.root,
+                result = self.run_command([sys.executable, ROOT / "scripts/lib/run_skill.py", "--project", self.root,
                                            script], success=False)
                 self.assertIn("skill 脚本路径", result.stderr)
 

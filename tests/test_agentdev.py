@@ -10,12 +10,12 @@ import sys
 import tempfile
 import unittest
 from unittest import mock
-from support import isolated_env
+from support import isolated_env, copy_source
 
 sys.dont_write_bytecode = True
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
-import agentdev
+from lib import installer as agentdev
 
 
 class CommandAliasTests(unittest.TestCase):
@@ -26,7 +26,7 @@ class CommandAliasTests(unittest.TestCase):
         py = agentdev.python_exe(self.home)
         py.parent.mkdir(parents=True)
         py.symlink_to(sys.executable)
-        entry = self.home / "app/scripts/agentdev.py"
+        entry = self.home / "app/scripts/command/app.py"
         entry.parent.mkdir(parents=True)
         entry.write_text(
             'import json, os, sys\n'
@@ -88,9 +88,9 @@ class CommandAliasTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.split(":").count(str(self.home / "bin")), 1)
 
-    def test_adev_setup_reactivates_only_after_success(self):
+    def test_activation_does_not_reload_environment_after_commands(self):
         for shell, flags in self.shells():
-            for command in ("setup", "-setup", "--s"):
+            for command in ("check",):
                 for code in (0, 23):
                     with self.subTest(shell=shell, command=command, code=code):
                         agentdev.write_launchers(self.home)
@@ -102,10 +102,11 @@ class CommandAliasTests(unittest.TestCase):
                             ADEV_REFRESH_ENV="1", ADEV_EXIT_CODE=str(code))
                         self.assertEqual(result.returncode, code, result.stderr)
                         self.assertEqual(result.stdout.splitlines()[-1],
-                                         "0:1" if code == 0 else "23:unset")
+                                         f"{code}:unset")
 
     def test_install_and_reinstall_copy_alias(self):
-        # Preserve the fake interpreter while exercising real staging/copy/launcher logic.
+        # This alias-only unit test uses an archive fixture; real Git installs are covered separately.
+        source = copy_source(Path(self.temporary.name) / "source")
         (self.home / "install.json").write_text("{}")
         with mock.patch.object(agentdev, "run"), \
                 mock.patch.object(agentdev.subprocess, "run", return_value=subprocess.CompletedProcess([], 0)), \
@@ -113,7 +114,7 @@ class CommandAliasTests(unittest.TestCase):
                 mock.patch.object(agentdev, "configure_path") as configure_path, \
                 contextlib.redirect_stdout(io.StringIO()):
             for _ in range(2):
-                agentdev.install(ROOT, self.home, no_path=True, repo="test-repository")
+                agentdev.install(source, self.home, no_path=True, repo="test-repository")
                 self.assertEqual((self.home / "app/adev").read_text(), (ROOT / "agentdev").read_text())
                 self.assertTrue(os.access(self.home / "bin/adev", os.X_OK))
             configure_path.assert_not_called()

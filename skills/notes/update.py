@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """项目自动更新触发器：欢迎语和 Stop hook 查询版本、启动后台进程。
 
-实际更新委托 scripts/update.sh / agentdev update 共用的跨平台核心，不在项目副本中拉取代码或执行全局 setup。
+实际更新委托 scripts/command/update.sh / agentdev update 共用的跨平台核心，不在项目副本中拉取代码或执行全局 setup。
 --welcome 输出版本提示；--run [--remote N] 后台检查全局安装并刷新当前工作区。
 update-ready 保留失败重试；锁与日志位于当前工作区 .agent/env/。旧 SessionStart 的无参数调用保持空操作。
 """
@@ -138,25 +138,25 @@ def check(root, cfg, remote=None):
     """项目 hook 只负责触发；实际更新由独立 update 入口的跨平台核心执行。"""
     skill = skill_dir()
     if not skill:
-        log("找不到 AgentDevWorkSpace，请先 agentdev setup，再 agentdev init")
-        return
-    if remote is None:
-        remote = fetch_remote(cfg)
-    if remote is None:
+        log("找不到 AgentDevWorkSpace，请先 source setup.sh，再 agentdev init")
         return
     manager = skill / "scripts" / "agentdev.py"
     if not manager.is_file():
         log("旧版安装缺少全局更新入口，请先执行新版 setup，再 agentdev init")
         return
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
+    if cfg.get("update_url"):
+        env["AGENTDEV_VERSION_URL"] = cfg["update_url"]
     if (skill / ".agentdev-app").is_file():
         env["AGENTDEV_HOME"] = str(skill.parent)
     with LOG.open("a", encoding="utf-8") as out:
-        result = subprocess.run([str(python_path(root)), str(manager), "update", "--project", str(root),
-                                 "--remote", format_version(remote)], stdin=subprocess.DEVNULL,
-                                stdout=out, stderr=out, env=env, timeout=300)
+        command = [str(python_path(root)), str(manager), "update", "--project", str(root)]
+        if remote is not None:
+            command += ["--remote", format_version(remote)]
+        result = subprocess.run(command, stdin=subprocess.DEVNULL,
+                                stdout=out, stderr=out, env=env, timeout=600)
     if result.returncode:
-        READY.write_text(format_version(remote) + "\n")
+        READY.write_text((format_version(remote) if remote is not None else "retry") + "\n")
         log(f"更新失败（退出码 {result.returncode}），下次触发时重试")
     else:
         READY.unlink(missing_ok=True)
@@ -171,19 +171,34 @@ def setup(root):
     if (skill / ".agentdev-app").is_file():
         env["AGENTDEV_HOME"] = str(skill.parent)
     with LOG.open("a", encoding="utf-8") as out:
-        result = subprocess.run([str(python_path(root)), str(skill / "scripts/agentdev.py"), "init", str(root)],
+        result = subprocess.run([str(python_path(root)), str(skill / "scripts/command/app.py"), "init", str(root)],
                                 stdin=subprocess.DEVNULL, stdout=out, stderr=out, env=env, timeout=120)
     if result.returncode == 0:
         READY.unlink(missing_ok=True)
+
+
+def installed_risk(skill):
+    """Use the installed checker; ordinary source projects are not managed app state."""
+    if not skill or not (skill / ".agentdev-app").is_file():
+        return "", False
+    sys.path.insert(0, str(skill / "scripts"))
+    try:
+        from lib.repository import installation_risk
+        return installation_risk(skill.parent)
+    except (ImportError, OSError):
+        return "风险提示：安装目录缺少 Git 检查器，无法检查本地改动；请从 master 源码运行 setup.sh 重装。", False
 
 
 def welcome(root):
     """欢迎语中的版本行：当场请求远端版本；本地落后或有待重试的 setup.sh 时立即启动后台更新。"""
     cfg = load_config(root)
     skill = skill_dir()
+    warning, blocked = installed_risk(skill)
     local = local_version(skill) if skill else None
     remote = fetch_remote(cfg)
-    if running():
+    if blocked:
+        state = "安装目录存在风险，已暂停自动更新"
+    elif running():
         state = "正在后台更新"
     elif local is None:
         state = "找不到 AgentDevWorkSpace，请重新执行 setup.sh"
@@ -202,9 +217,9 @@ def welcome(root):
         line = f"发现远端版本更新，由本地{local_text}版本更新到{remote_text}版本"
         if state != "正在后台更新":
             line += f"（{state}）"
-        print(line)
     else:
-        print(f"AgentDevWorkSpace 版本：本地 {local_text}，远端 {remote_text}（{state}）")
+        line = f"AgentDevWorkSpace 版本：本地 {local_text}，远端 {remote_text}（{state}）"
+    print(line + ("\n" + warning if warning else ""))
 
 
 def main():

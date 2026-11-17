@@ -86,7 +86,7 @@ class Entrypoints(unittest.TestCase):
         self.env.pop('NO_COLOR', None)
 
     def cli(self, args=(), tty=True, extra=None):
-        command = ['sh', str(ROOT / 'scripts/codex.sh'), *args]
+        command = ['sh', str(ROOT / 'scripts/command/codex.sh'), *args]
         env = {**self.env, **(extra or {})}
         if not tty:
             return subprocess.run(command, cwd=self.root, env=env, capture_output=True, text=True, check=True, timeout=10).stdout

@@ -21,37 +21,93 @@ fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 
 
 ## agentdev 命令
 
-`adev` 是 `agentdev` 的等价短命令，支持相同的子命令、参数与退出码，例如 `adev init`、`adev --i`。已有安装重新执行 `agentdev setup` 后即可使用。
+`adev` 是 `agentdev` 的等价短命令，支持相同的子命令、参数与退出码，例如 `adev init`、`adev --i`。已有安装重新执行 `source setup.sh` 后即可使用。
 
 直接输入 `agentdev` 默认显示帮助，命令与别名统一如下（例如 `agentdev init` 与 `agentdev --i` 等价）：
 
 | 命令 | 别名 | 行为 |
 | --- | --- | --- |
 | `agentdev help` | `agentdev --h` | 展示所有命令 |
-| `agentdev setup` | `agentdev --s` | 全局安装或重新安装程序及共享依赖 |
 | `agentdev init [目录]` | `agentdev --i [目录]` | 初始化工作区，完成后自动检查环境；失败返回非零 |
 | `agentdev update` | `agentdev --u` | 检查版本，有新版时更新全局程序和当前工作区 |
 | `agentdev version` | `agentdev --v` | 展示本地与远端版本；查询失败时明确报错 |
 | `agentdev check [目录]` | `agentdev --c [目录]` | 单独只读检查工作区和环境，不修复文件 |
 
-旧单横线形式作为兼容别名保留，帮助和示例使用上表规范。
+上表命令的旧单横线形式作为兼容别名保留。安装不属于 app 命令：`setup`、`-setup`、`--s` 已移除，请直接运行或 source 根目录的 `setup.sh`；帮助和示例使用上表规范。
 
-`agentdev update --check` 仅查询版本，不安装。`update.sh` 是独立更新入口，版本和源码都取主仓库 master 分支。未安装、Git/Python 缺失、版本查询或更新失败时返回非零，不显示成功。
+`agentdev update --check` 查询版本并只读检查安装仓库，不安装。`update.sh` 是独立更新入口，版本和源码都取主仓库 master 分支。未安装、Git/Python 缺失、版本查询或更新失败时返回非零，不显示成功。
 
 ## 全局目录
 
 ```text
 ~/.agent-dev-workspace/
-├── app/             受管理的程序和 skill 模板（含 publish/version）
+├── app/             受管理的 master Git 工作树（含独立 .git、源码与 publish/version）
 ├── venv/            共享 Python 环境，使用 bin/python
 ├── bin/             agentdev / adev 命令入口
 ├── env              bash/zsh/sh 激活文件（另有 env.fish）
-└── install.json     更新使用的源仓库与 PATH 配置状态
+├── install.json     源仓库、PATH 配置及安装基准 commit
+├── update-status.json  手动/自动更新共享状态，原子写入，不随 app 替换
+├── logs/            每任务 update-<task_id>.log，保留子进程输出
+└── .update.lock     安装级内核更新锁（文件保留，进程退出自动释放锁）
 ```
 
-setup 在 macOS/Linux 注册当前用户的 shell PATH（zsh 的 `.zshrc`，bash 的 `.bashrc`/登录配置，fish 的 config.fish）；不写系统目录或安装系统级依赖。可用 `agentdev setup --no-path` 跳过 PATH 修改，之后通过完整路径调用 `bin/agentdev` 或 `bin/adev` 。`AGENTDEV_HOME` 可指定安装目录；测试使用仓库内隔离目录，不修改真实主目录。
+setup 在 macOS/Linux 注册当前用户的 shell PATH（zsh 的 `.zshrc`，bash 的 `.bashrc`/登录配置，fish 的 config.fish）；不写系统目录或安装系统级依赖。可用 `source setup.sh --no-path` 跳过 PATH 修改，之后通过完整路径调用 `bin/agentdev` 或 `bin/adev` 。`AGENTDEV_HOME` 可指定安装目录；测试使用仓库内隔离目录，不修改真实主目录。
 
-setup 可从当前源码安装，包含尚未提交的源码改动；更新根据 `install.json` 记录的 Git 仓库和远端版本，下载到临时目录，验证版本后替换 `app/`，失败保留原程序和可重试状态。安装与更新使用全局互斥锁。保留项目的配置、custom skills、个人约束和 Note；旧项目本地 venv 不删除。
+setup 从 Git 源码安装时要求当前分支为 master。安装目录保留完整 Git 工作树与独立 `.git`，仅克隆 master（浅克隆、无其他分支或标签），不依赖原源码/更新临时目录的对象。源码中尚未提交的受控文件改动和非忽略未跟踪文件会保留，不会伪造提交；被忽略的私有配置、环境不复制。使用带本地改动的源码安装，之后也会收到安装目录改动提示。
+
+`agentdev version`、`agentdev update`（含 `--check`）和欢迎语版本检查同时检测安装目录的已暂存/未暂存/删除/未跟踪文件，并将分支及 HEAD 与安装基准比较。异常会展示“异常改动”风险提示和文件名，不附带备份/git status 提示；即使远端版本查询失败，本地风险也会展示。标记文件与 Python 字节码不会导致正常安装误报，当前业务项目的改动不计入安装风险。
+
+存在本地改动、HEAD/分支异常或 Git 状态无法检查时，实际覆盖式更新会暂停，欢迎语不启动后台覆盖；请先备份并处理改动，不会自动 reset/clean。旧安装或归档源码没有 `.git` 时明确提示“无法检查”，不是“目录干净”；这类旧快照允许在下次有新版本时更新为带 Git 的安装，也可从 master 源码执行 setup.sh 重装。源码安装、重装是显式替换操作，应先备份原安装改动。
+
+更新仍根据 `install.json` 记录的 Git 仓库和远端版本，临时克隆 master、验证版本后替换 `app/`，失败保留原程序和可重试状态。安装与更新使用全局互斥锁。保留项目的配置、custom skills、个人约束和 Note；旧项目本地 venv 不删除。在安装目录本身执行 update 不会把它初始化为业务项目。
+
+## 更新进度与通知
+
+手动 `agentdev update` 与欢迎语/Stop hook 的后台更新使用同一个安装级任务：
+
+- 状态写在 `${AGENTDEV_HOME:-~/.agent-dev-workspace}/update-status.json`，不放进 `app/`；采用同目录临时文件、flush/fsync 和原子替换，读取方不会看到半份 JSON。
+- `schema_version=1`；记录 `task_id`、`pid`、`client`、`stage`、`started_at/updated_at/finished_at/expires_at`（Unix 秒）、`from_version/to_version`、`result`、`error/failed_stage`、`project` 与 `log_path`。结果为 `running/success/failed/blocked`。
+- 真实阶段包括安装目录检查、下载源码、安装依赖、运行环境验证、准备/切换安装、刷新工作区。CLI 输出阶段；Git/pip/init 的子进程输出保存在独立任务日志中。
+- 多项目同时触发会等待安装级锁；首个任务升级后，其他项目重新读取版本，仅刷新各自工作区，不重复下载、不生成另一组成功通知，也不覆盖刚完成的状态。
+- 无新版或 `--check` 不创建任务，也不覆盖之前的状态。风险阻止、版本获取失败、下载/安装/刷新失败有终态；实际覆盖保护和安装回滚保留。
+
+查询与控制：
+
+```sh
+agentdev update --status          # 查看最近任务及日志，不安装、不查远端
+agentdev update --status --watch  # 持续查看；结束结果保留至完成后 10 秒再退出
+agentdev update --notify none     # 本次不发系统通知
+```
+
+`--notify auto|system|none` 默认 `auto`；`AGENTDEV_NOTIFY` 可设置默认方式，显式非 auto 参数优先。`AGENTDEV_CLIENT=claude|codex` 指明调用客户端，新注册的 hook 自动传递。`--status --watch` 输出普通文本，不擦除终端历史；10 秒清除指 Claude 插件的临时提示，日志与最终状态均保留。
+
+### Claude Code：外置插件
+
+提供 [`plugins/claude-update/`](plugins/claude-update/README.md) Mod 插件，通过官方 `session.start`、`clock.every/after`、`ui.status` 每秒刷新输入框下方的状态，不需要先发送聊天消息，不改原有状态栏设置。成功、失败、暂停按**任务完成时间 + 10 秒**清除，新的任务不会被旧计时器清除。需要支持 Mod 的 Claude Code（官方教程要求 v2.1.287+）；组织策略或安全模式可能禁用插件。
+
+```sh
+claude --plugin-dir "${AGENTDEV_HOME:-$HOME/.agent-dev-workspace}/app/plugins/claude-update"
+```
+
+这是手动加载示例，setup/init 不写全局 Claude 配置，也不自动安装插件。未加载时仍可使用 CLI 查询。自定义安装路径通过环境变量或项目内受管理安装指针发现。
+
+### Codex：系统通知
+
+Codex 不需要插件或客户端补丁。实际更新任务只发送开始与最终结果两条通知，避免按阶段刷屏；阶段细节可在 CLI/任务日志查看。
+
+- macOS：已有的 `osascript`，固定 AppleScript + 参数传入，不拼接脚本。
+- Linux：已有的 `notify-send`，请求 10000ms 超时；缺少通知工具/桌面环境、SSH 会话、通知服务不可用或发送超时均不影响更新，不自动安装依赖。
+- 系统通知由 OS/桌面策略控制，**不能跨平台保证精确 10 秒消失**；Claude 插件按本程序时间控制清除。
+
+示例输出（版本仅为测试夹具）：
+
+```text
+AgentDevWorkSpace · 下载源码
+AgentDevWorkSpace · 安装依赖
+AgentDevWorkSpace · 刷新工作区
+AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
+更新日志：<安装根目录>/logs/update-<task_id>.log
+```
 
 ## 工作区初始化与检查
 
@@ -68,6 +124,8 @@ setup 可从当前源码安装，包含尚未提交的源码改动；更新根�
 `agentdev check` 不修复或写入文件；它检查当前目录是否存在有效工作区、安装路径和解释器是否可用、Python 3.9+/venv/pip/依赖版本、Note 配置格式以及必要 hook。缺项会列出并返回非零。`agentdev init` 已自动执行该检查，日常初始化无需再手动 check。更新后自动刷新当前工作区；其他项目可重新执行 `agentdev init` 同步模板。
 
 在 AgentDevWorkSpace 自身的源码根目录中，`update` 刷新工作区时不会创建、追加或替换 `AGENTS.md` 和 `.gitignore`；skills、环境指针及 hook 仍正常同步，手动 `init` 也遵循相同保护。源码目录通过 Git remote URL 识别（任意 remote 指向主仓库即可，兼容 HTTPS、SSH/SCP 与 git 协议、可选 `.git` 后缀），不依赖目录名或源码文件布局，并排除带 `.agentdev-app` 标记的受管理安装；普通项目保持原有行为。此前已写入这两个文件的内容不会自动清理。
+
+兼容旧版更新器与尚未刷新的 hook，`scripts/agentdev.py`、`scripts/run_skill.py` 仅保留薄转发入口，`scripts/setup.sh`、`scripts/deps.sh` 仅保留链接；实际实现均位于 `command/` 或 `lib/`，不会重新开放 app 的 setup 命令。
 
 ## 个人目录与统一配置
 
@@ -93,7 +151,7 @@ setup 可从当前源码安装，包含尚未提交的源码改动；更新根�
 要在输入任何消息前看到欢迎语，在已接入项目中用以下入口启动（支持原有 CLI 参数）：
 
 ```sh
-sh <AgentDevWorkSpace 路径>/scripts/codex.sh
+sh <AgentDevWorkSpace 路径>/scripts/command/codex.sh
 ```
 
 入口先查询并打印 AgentDevWorkSpace 的版本信息或更新提示，以及项目 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common）；发现新版本时在后台更新（notes skill 的 `update.py --welcome`），
@@ -106,7 +164,7 @@ sh <AgentDevWorkSpace 路径>/scripts/codex.sh
 
 ```sh
 function codex {
-  sh '/绝对路径/AgentDevWorkSpace/scripts/codex.sh' "$@"
+  sh '/绝对路径/AgentDevWorkSpace/scripts/command/codex.sh' "$@"
 }
 ```
 
@@ -141,16 +199,16 @@ AGENTS.md                  规则
 agentdev / adev             macOS/Linux 源码命令入口，默认展示帮助
 setup.sh                   安装与 bash/zsh 当前会话激活入口
 update.sh                  独立更新入口
-scripts/agentdev.py         命令解析、全局安装、更新、版本与 PATH 注册
-scripts/workspace.py        工作区初始化、只读检查及平台链接/复制
-scripts/run_skill.py        跨平台 hook 分发
-scripts/setup.sh           全局安装 / 重新安装及 bash/zsh source 激活
-scripts/init.sh            agentdev init 的 POSIX 兼容入口，初始化项目和工作区
-scripts/deps.sh            共享依赖清单与 POSIX 手动安装入口
-scripts/check.sh           agentdev check 的 POSIX 入口，工作区与环境只读检查
-scripts/fix.sh             旧 Note 迁移的 POSIX 兼容入口（init 自动迁移）
-scripts/codex.sh           Codex CLI 启动入口：输入首条消息前打印欢迎语
-scripts/root.sh            保留的旧版 shell 路径辅助；新入口使用跨平台核心
+scripts/command/app.py     CLI 参数解析与命令分发
+scripts/command/           help / init / check / update / version 的实现
+scripts/command/*.sh       init / check / update 的 shell 入口及 Codex 启动器
+scripts/lib/installer.py   全局安装、运行时、PATH 与安装锁
+scripts/lib/repository.py  独立 master 工作树安装与 Git 改动风险检查
+scripts/lib/setup.py       仅供根 setup.sh 调用的安装实现
+scripts/lib/workspace.py   工作区初始化、只读检查及链接/复制
+scripts/lib/run_skill.py   hook 分发
+scripts/lib/deps.sh        共享依赖清单与手动依赖安装辅助入口
+scripts/lib/               bootstrap、旧 Note 迁移、shell 路径辅助
 publish/publish.sh         发布：默认补丁 +1，支持指定三段版本，只提交并推送主仓库
 publish/version            唯一版本文件（MAJOR.MINOR.PATCH）
 skills/git-commit/SKILL.md      git-commit skill：提交信息规则

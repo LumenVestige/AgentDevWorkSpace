@@ -1,0 +1,4 @@
+{
+  "description": "Read the installation-level update-status.json without starting a chat turn",
+  "modules": ["./register.js"]
+}
