@@ -147,43 +147,11 @@ AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
 - init 会把旧 `notes.json5` 更名为 `config.json5`，保留内容和注释；两者并存时新文件优先，旧文件不覆盖或合并。
 - 无论是否是 Git 仓库，init 都会正常创建或补充 `.gitignore`，保留已有条目。
 
-## Codex CLI 启动欢迎语
+## 宿主接入与欢迎语
 
-要在输入任何消息前看到欢迎语，在已接入项目中用以下入口启动（支持原有 CLI 参数）：
+Codex、Claude 仅通过官方提供的 hook 回调或外置插件接入。不得修改宿主启动脚本或 shell 启动配置，也不得用同名函数、别名或命令包装器接管宿主启动。
 
-```sh
-sh "${AGENTDEV_HOME:-$HOME/.agent-dev-workspace}/app/scripts/command/codex.sh"
-```
-
-入口使用全局安装目录（macOS/Linux 相同）中的副本，随 `agentdev update` 更新；不要指向 clone 下来的源码目录，源码目录只用于安装，移动、删除或调整脚本位置后转发会失效。入口只按启动目录查找项目的 `agent-workspace/`，与自身位置无关。
-
-入口先查询并打印 AgentDevWorkSpace 的版本信息或更新提示，以及项目 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common）；发现新版本时在后台更新（notes skill 的 `update.py --welcome`），
-再用 `--no-alt-screen` 启动原生 Codex，保留终端中的欢迎语；不发送初始消息、不调用模型。
-欢迎语使用带 emoji 的三列表格展示快捷命令、用途和示例，中文列自动对齐，窄终端自动换行；交互终端带彩色标题和版本状态，设置 `NO_COLOR=1` 或 `TERM=dumb` 可关闭颜色。SessionStart hook 输出无 ANSI 的纯文本表格，缺少渲染器或 Python 时启动入口保留文本显示。
-`--help`、`--version`、`exec` 等子命令、恢复会话及重定向输出直接转发，不打印欢迎语。
-支持从项目子目录启动和 `-C/--cd` 指定项目。此入口只处理进程启动，CLI 内部 `/clear` 仍由 hook 处理。
-
-如果希望仍直接输入 `codex`，可自行添加转发函数。zsh（`~/.zshrc`）和 bash（Linux 的 `~/.bashrc`）：
-
-```sh
-codex() {
-  sh "${AGENTDEV_HOME:-$HOME/.agent-dev-workspace}/app/scripts/command/codex.sh" "$@"
-}
-```
-
-fish（`~/.config/fish/functions/codex.fish`）：
-
-```fish
-function codex
-    set -l home $HOME/.agent-dev-workspace
-    set -q AGENTDEV_HOME; and set home $AGENTDEV_HOME
-    sh $home/app/scripts/command/codex.sh $argv
-end
-```
-
-安装时用 `AGENTDEV_HOME` 指定过其他目录、但平时 shell 中未设置该变量的，把默认路径改为实际安装目录。
-
-setup 只注册 agentdev 所需的 PATH，不会添加 codex 转发函数；移除该函数即可恢复原生命令。
+欢迎语由官方 SessionStart hook 输出，显示时机由客户端决定；不通过启动转发脚本保证输入首条消息前展示。hook 使用项目的 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），展示版本信息和 SDD 快捷命令。Claude 的更新进度可通过前述外置插件展示。
 
 ## 版本与发布
 
