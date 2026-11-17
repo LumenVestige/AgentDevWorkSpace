@@ -27,9 +27,10 @@ fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 
 | 命令 | 别名 | 行为 |
 | --- | --- | --- |
 | `agentdev help` | `agentdev --h` | 展示所有命令 |
-| `agentdev init [目录]` | `agentdev --i [目录]` | 初始化工作区，完成后自动检查环境；失败返回非零 |
+| `agentdev init [目录]` | `agentdev --i [目录]` | 调用 deps.sh 安装共享依赖，再初始化工作区并检查环境；失败返回非零 |
 | `agentdev update` | `agentdev --u` | 检查版本，强制覆盖安装目录改动并刷新当前工作区 |
 | `agentdev version` | `agentdev --v` | 展示本地与远端版本；查询失败时明确报错 |
+| `agentdev fix [目录]` | `agentdev --f [目录]` | 显式修复旧版 notes 目录，不覆盖已有文件 |
 | `agentdev check [目录]` | `agentdev --c [目录]` | 只读检查安装目录改动、工作区和环境，不修复文件 |
 
 上表命令的旧单横线形式作为兼容别名保留。安装不属于 app 命令：`setup`、`-setup`、`--s` 已移除，请直接运行或 source 根目录的 `setup.sh`；帮助和示例使用上表规范。
@@ -49,6 +50,8 @@ fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 
 ├── logs/            每任务 update-<task_id>.log，保留子进程输出
 └── .update.lock     安装级内核更新锁（文件保留，进程退出自动释放锁）
 ```
+
+setup 只安装程序并准备共享 Python venv / pip，不执行 `deps.sh`，也不安装 json5 等 skill 依赖；依赖由 `agentdev init` 显式安装。重装 setup 不卸载已有依赖。
 
 setup 在 macOS/Linux 注册当前用户的 shell PATH（zsh 的 `.zshrc`，bash 的 `.bashrc`/登录配置，fish 的 config.fish）；不写系统目录或安装系统级依赖。可用 `source setup.sh --no-path` 跳过 PATH 修改，之后通过完整路径调用 `bin/agentdev` 或 `bin/adev` 。`AGENTDEV_HOME` 可指定安装目录；测试使用仓库内隔离目录，不修改真实主目录。
 
@@ -104,10 +107,11 @@ AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
 
 ## 工作区初始化与检查
 
-`agentdev init` 在当前目录创建 `agent-workspace/`，不要求工具位于项目内部。支持 Git 仓库根目录和非 Git 目录；在已有 Git 仓库的子目录执行时会提示切换到仓库根目录，避免创建嵌套工作区。Git 项目未配置 personal 时须设置 `git user.name`；非 Git 项目默认使用电脑用户名，不依赖 Git 用户配置。
+`agentdev init` 先显式执行安装源码中的 `scripts/lib/deps.sh`，将固定版本依赖安装到全局共享 `venv/`（使用安装级 pip 缓存），完整验证后才在当前目录创建 `agent-workspace/`，不要求工具位于项目内部。支持 Git 仓库根目录和非 Git 目录；在已有 Git 仓库的子目录执行时会提示切换到仓库根目录，避免创建嵌套工作区。Git 项目未配置 personal 时须设置 `git user.name`；非 Git 项目默认使用电脑用户名，不依赖 Git 用户配置。
 
+- 依赖安装失败或超时返回非零，不继续创建或刷新工作区；`check` 和 `fix` 不触发依赖安装。`update` 保留原有依赖安装与环境验证，刷新工作区时也遵循 init 流程。
 - `skills/common/` 每次从全局模板整体刷新；`skills/custom/` 保留，同名时优先。
-- 按统一命名规则创建个人目录、`specs/constraints.md` 和 `notes/`，保留已有内容；旧版平铺 Note 迁移到按类型、日期归档的目录，目标已有时不覆盖。
+- 按统一命名规则创建个人目录、`specs/constraints.md` 和 `notes/`，保留已有内容；不再自动迁移旧版平铺 Note，迁移须显式运行 `agentdev fix`。
 - `config/config.json5` 不存在时从模板复制；`.agent/env/python-path` 和 `agentskill-path` 记录共享解释器及全局程序位置。
 - 保留项目原有 `AGENTS.md` 内容，标记块只引用 `agent-workspace/AGENTS.md`，通用规则同步到该独立文件，不再追加规则全文；再次初始化会替换旧的受管明文块，并迁移未被用户修改的受管入口。用户自建符号链接和已修改的受管副本保持不变。链接 `CLAUDE.md` 和 `.claude/skills/`；链接不可用时复制，并保留复制后被用户修改的文件。
 - 注册 Claude Code 和 Codex 的 Stop / SessionStart hook，保留其他 hook；由共享 Python 启动器选择 custom 优先的脚本。Codex 中仍需由用户信任项目及 hook。
@@ -119,6 +123,21 @@ AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
 在 AgentDevWorkSpace 自身的源码根目录中，`update` 刷新工作区时不会创建、追加或替换 `AGENTS.md` 和 `.gitignore`；skills、环境指针及 hook 仍正常同步，手动 `init` 也遵循相同保护。源码目录通过 Git remote URL 识别（任意 remote 指向主仓库即可，兼容 HTTPS、SSH/SCP 与 git 协议、可选 `.git` 后缀），不依赖目录名或源码文件布局，并排除带 `.agentdev-app` 标记的受管理安装；普通项目保持原有行为。此前已写入这两个文件的内容不会自动清理。
 
 兼容旧版更新器与尚未刷新的 hook，`scripts/agentdev.py`、`scripts/run_skill.py` 仅保留薄转发入口，`scripts/setup.sh`、`scripts/deps.sh` 仅保留链接；实际实现均位于 `command/` 或 `lib/`，不会重新开放 app 的 setup 命令。
+
+## 修复旧版 notes 目录
+
+```sh
+agentdev fix            # 修复当前工作区（adev fix 等价）
+agentdev fix /path/to/project  # 修复指定工作区；也可用 --f / -fix
+```
+
+`fix` 独立于 `setup`、`init` 和 `update`，目前只迁移当前配置用户的旧版平铺 Note：
+`agent-workspace/<个人目录>/notes/yy-MM-dd-HH-mm-ss-<topic>.md` →
+`notes/git-commit-change/YYYY-MM-DD/HH-mm-ss-<topic>.md`，文件内容不变。
+仅处理当前 `personal`（兼容 `peronsal`，未配置时使用默认用户名），不移动其他用户目录或不匹配命名的文件。
+目标存在时跳过并保留源文件，输出迁移数和冲突跳过数，可重复运行；无旧 Note 时成功且不写文件。
+目录不存在、没有 `agent-workspace/` 或配置错误时返回非零，不自动初始化、安装或更新。
+旧 `scripts/lib/fix.py` / `fix.sh` 入口保留兼容；初始化和更新不再隐式执行 Note 迁移，其他配置与安装兼容迁移不受影响。
 
 ## 个人目录与统一配置
 
@@ -175,8 +194,9 @@ agentdev / adev             macOS/Linux 源码命令入口，默认展示帮助
 setup.sh                   安装与 bash/zsh 当前会话激活入口
 update.sh                  独立更新入口
 scripts/command/app.py     CLI 参数解析与命令分发
-scripts/command/           help / init / check / update / version 的实现
+scripts/command/           help / init / check / fix / update / version 的实现
 scripts/command/*.sh       init / check / update 的 shell 入口及 Codex 启动器
+scripts/lib/fix.py, fix.sh  旧版 notes 迁移及兼容入口
 scripts/lib/installer.py   全局安装、运行时、PATH 与安装锁
 scripts/lib/repository.py  独立 master 工作树安装与 Git 改动风险检查
 scripts/lib/setup.py       仅供根 setup.sh 调用的安装实现

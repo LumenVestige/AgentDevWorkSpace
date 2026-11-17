@@ -4,7 +4,7 @@ import os
 from unittest.mock import patch
 
 from support import Sandbox, snapshot
-from lib import workspace
+from lib.fix import fix_notes
 
 
 class Notes(Sandbox):
@@ -181,8 +181,8 @@ class Notes(Sandbox):
         target.parent.mkdir(parents=True)
         target.write_text("NEW MUST REMAIN")
         with patch.dict(os.environ, self.env, clear=True):
-            workspace.fix_notes(self.root)
-            workspace.fix_notes(self.root)
+            fix_notes(self.root)
+            fix_notes(self.root)
         self.assertFalse(old.exists())
         self.assertEqual((target.parent / "03-04-05-legacy.md").read_text(), "LEGACY")
         self.assertEqual(collision.read_text(), "OLD MUST REMAIN")

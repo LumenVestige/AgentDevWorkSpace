@@ -20,7 +20,7 @@ def main():
         raise RuntimeError("需要先安装 Git，并将 git 加入 PATH")
     home = global_home()
     with installation_lock(home):
-        install(ROOT, home, args.no_path)
+        install(ROOT, home, args.no_path, install_dependencies=False)
 
 
 if __name__ == "__main__":

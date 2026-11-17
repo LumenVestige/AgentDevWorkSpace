@@ -53,7 +53,7 @@ class CommandAliasTests(unittest.TestCase):
                 yield name, flags
 
     def test_source_alias_matches_original_help_and_errors(self):
-        for args in ([], ["help"], ["--h"], ["init", "--help"], ["not-a-command"]):
+        for args in ([], ["help"], ["--h"], ["init", "--help"], ["fix", "--help"], ["not-a-command"]):
             with self.subTest(args=args):
                 original = self.run_command([ROOT / "agentdev", *args])
                 alias = self.run_command([ROOT / "adev", *args])

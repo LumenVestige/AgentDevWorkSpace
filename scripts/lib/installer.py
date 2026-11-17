@@ -172,7 +172,7 @@ def repair_repository(home, checkout):
     return commit
 
 
-def install(source, home, no_path=False, repo=None, progress=None):
+def install(source, home, no_path=False, repo=None, progress=None, install_dependencies=True):
     source, home = source.resolve(), home.absolute()
     read_version(source)
     if home == source:
@@ -195,11 +195,12 @@ def install(source, home, no_path=False, repo=None, progress=None):
         usable = False
     if not usable:
         runner([sys.executable, "-m", "venv", home / "venv"], timeout=120)
-    env = {**os.environ, "PIP_CONFIG_FILE": os.devnull, "PIP_CACHE_DIR": str(home / "cache"), "PYTHONDONTWRITEBYTECODE": "1"}
-    runner([str(py), "-m", "pip", "install", "--disable-pip-version-check", *requirements(source)], env=env, timeout=120)
+    if install_dependencies:
+        env = {**os.environ, "PIP_CONFIG_FILE": os.devnull, "PIP_CACHE_DIR": str(home / "cache"), "PYTHONDONTWRITEBYTECODE": "1"}
+        runner([str(py), "-m", "pip", "install", "--disable-pip-version-check", *requirements(source)], env=env, timeout=120)
     if progress:
         progress.stage("validating")
-    errors = runtime_errors(py, source)
+    errors = runtime_errors(py, source, check_dependencies=install_dependencies)
     if errors:
         raise RuntimeError("；".join(errors))
     previous = home / "app.previous"

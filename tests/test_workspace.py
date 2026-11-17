@@ -36,8 +36,8 @@ class SourceWorkspaceTests(unittest.TestCase):
         for patcher in (
             mock.patch.dict(os.environ, isolated_env(self.base), clear=True),
             mock.patch.object(workspace, "runtime_errors", return_value=[]),
+            mock.patch.object(workspace, "install_dependencies"),
             mock.patch.object(workspace, "project_settings", return_value={"personal": "tester"}),
-            mock.patch.object(workspace, "fix_notes"),
             contextlib.redirect_stdout(io.StringIO()),
         ):
             patcher.__enter__()
@@ -103,6 +103,19 @@ class SourceWorkspaceTests(unittest.TestCase):
                 self.update(project, remote, current_directory=index == 0)
                 self.assertEqual(self.snapshot(project), before)
                 self.assert_workspace_refreshed(project)
+
+    def test_init_and_update_leave_legacy_notes_for_explicit_fix(self):
+        project = self.project(source=False)
+        notes = project / "agent-workspace/tester/notes"
+        notes.mkdir(parents=True)
+        legacy = notes / "26-11-17-10-20-30-topic.md"
+        legacy.write_bytes(b"# Legacy note\r\n")
+        for refresh in (lambda: workspace.initialize(self.source, self.home, project),
+                        lambda: self.update(project, self.version),
+                        lambda: self.update(project, (*self.version[:2], self.version[2] + 1))):
+            refresh()
+            self.assertEqual(legacy.read_bytes(), b"# Legacy note\r\n")
+            self.assertFalse((notes / "git-commit-change").exists())
 
     def test_update_regular_project_still_updates_managed_files(self):
         project = self.project("AgentDevWorkSpace", source=False)

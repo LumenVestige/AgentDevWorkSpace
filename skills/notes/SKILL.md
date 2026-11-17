@@ -15,7 +15,7 @@ description: 写 Note（改动记录）。完成改变行为、架构、接口�
 - 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不迁移已有目录；
 - 日期目录和文件名中的时间取创建时刻，文件名不再包含年月日；topic 用小写字母、数字加 `-`；
 - 例如 `agent-workspace/tony/notes/git-commit-change/2026-08-25/14-30-05-local-cli-status-restart.md`；
-- 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由 init 时调用的 `scripts/lib/workspace.py` 中 `fix_notes()` 移到 `git-commit-change/<YYYY-MM-DD>/`。
+- 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由用户显式运行 `agentdev fix [目录]`（或 `adev fix`、`agentdev --f`）移到 `git-commit-change/<YYYY-MM-DD>/`；setup / init / update 不再自动迁移。只处理当前配置用户，目标已存在时跳过并保留源文件，可重复执行。
 
 ## 创建
 

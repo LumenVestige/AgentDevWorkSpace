@@ -53,24 +53,25 @@ def project_settings(project, py=None, source=None, migrate=False):
     return json.loads(result.stdout)
 
 
-def runtime_errors(py, source):
+def runtime_errors(py, source, check_dependencies=True):
     if not py.is_file():
         return [f"Python 解释器不存在：{py}"]
+    deps = requirements(source) if check_dependencies else []
     code = ("import importlib.metadata as m,json,sys; "
             "print(json.dumps({'version':list(sys.version_info[:2]),'venv':sys.prefix!=sys.base_prefix,"
             "'packages':{s.split('==')[0]:m.version(s.split('==')[0]) for s in sys.argv[1:]}}))")
     env = {**os.environ, "PYTHONDONTWRITEBYTECODE": "1"}
     try:
-        result = subprocess.run([str(py), "-B", "-c", code, *requirements(source)], env=env, capture_output=True, text=True, timeout=20)
+        result = subprocess.run([str(py), "-B", "-c", code, *deps], env=env, capture_output=True, text=True, timeout=20)
         if result.returncode:
-            return ["Python 无法运行或缺少依赖，请重新执行 source setup.sh"]
+            return ["Python 无法运行或缺少依赖，请重新执行 source setup.sh 和 agentdev init"]
         data = json.loads(result.stdout)
         errors = []
         if data["version"] < [3, 9]:
             errors.append("需要 Python 3.9+")
         if not data["venv"]:
             errors.append("解释器不在虚拟环境中")
-        for spec in requirements(source):
+        for spec in deps:
             name, expected = spec.split("==")
             if data["packages"].get(name) != expected:
                 errors.append(f"依赖版本不匹配：{spec}")
@@ -80,6 +81,19 @@ def runtime_errors(py, source):
         return errors
     except (OSError, ValueError, subprocess.SubprocessError) as error:
         return [f"环境检查失败：{error}"]
+
+
+def install_dependencies(source, home):
+    py = home / "venv/bin/python"
+    # 缺包不能阻止 init 修复依赖，但必须先确认目标确实是可用的共享 venv。
+    errors = runtime_errors(py, source, check_dependencies=False)
+    if errors:
+        raise RuntimeError("；".join(errors))
+    print("正在安装工作区依赖（deps.sh）…", flush=True)
+    env = {**os.environ, "PIP_CONFIG_FILE": os.devnull, "PIP_CACHE_DIR": str(home / "cache"),
+           "PYTHONDONTWRITEBYTECODE": "1"}
+    subprocess.run(["sh", str(source / "scripts/lib/deps.sh"), str(py)],
+                   env=env, check=True, timeout=120)
 
 
 def write_if_changed(path, text):
@@ -200,21 +214,6 @@ def register_hooks(path, cfg, py, source, project):
     write_if_changed(path, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
 
 
-def fix_notes(project):
-    user = project_settings(project)["personal"]
-    if not user:
-        return
-    notes = project / "agent-workspace" / user / "notes"
-    pattern = re.compile(r"^(\d{2}-\d{2}-\d{2})-(\d{2}-\d{2}-\d{2}-.+\.md)$")
-    for file in notes.glob("*.md"):
-        match = pattern.fullmatch(file.name)
-        if match:
-            target = notes / "git-commit-change" / ("20" + match[1]) / match[2]
-            if not target.exists():
-                target.parent.mkdir(parents=True, exist_ok=True)
-                file.rename(target)
-
-
 def repository_identity(url):
     """统一 URL 和 SCP 风格地址，仅比较主机与仓库路径。"""
     url = re.sub(r"^([^/:]+):(?=[^/])", r"ssh://\1/", url.strip())
@@ -247,6 +246,7 @@ def initialize(source, home, project):
         raise RuntimeError("请在 Git 仓库根目录执行 agentdev init，避免创建嵌套工作区")
     source_repository = is_source_repository(project)
     py = home / "venv" / "bin/python"
+    install_dependencies(source, home)
     errors = runtime_errors(py, source)
     if errors:
         raise RuntimeError("；".join(errors))
@@ -313,7 +313,6 @@ def initialize(source, home, project):
         git(project, "config", "agentskill.python", str(py))
     for path, cfg in configs.items():
         register_hooks(path, cfg, py, source, project)
-    fix_notes(project)
     print(f"已初始化：{project}（agent-workspace/{user}，共享运行时 {py}）")
     print("Codex 首次使用项目 hook 时，请在客户端中信任本项目及相关 hook。")
 

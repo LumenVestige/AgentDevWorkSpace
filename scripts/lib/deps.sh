@@ -1,6 +1,7 @@
 #!/bin/sh
 # 用法：sh <AgentDevWorkSpace 路径>/scripts/lib/deps.sh [python 解释器]
-# 依赖清单供跨平台全局安装器读取；此 POSIX 辅助入口也可手动安装到指定解释器。
+# init 显式调用本入口安装共享环境依赖；setup 不安装这些依赖，update 仍读取本清单。
+# 也可手动调用并传入虚拟环境解释器。
 # 默认优先使用全局共享 venv，其次读取当前项目的 python-path / agentskill.python。
 set -e
 unset GIT_DIR GIT_WORK_TREE

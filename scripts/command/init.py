@@ -1,11 +1,11 @@
-"""初始化当前工作区并检查。"""
+"""安装共享依赖、初始化当前工作区并检查。"""
 from pathlib import Path
 from lib.installer import global_home, installed
 from lib.workspace import initialize, check_workspace
 
 
 def register(commands):
-    parser = commands.add_parser("init", help="初始化当前目录的 agent-workspace/")
+    parser = commands.add_parser("init", help="安装共享依赖并初始化当前目录的 agent-workspace/")
     parser.add_argument("directory", nargs="?", default=".")
     parser.set_defaults(handler=execute)
 
