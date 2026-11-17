@@ -59,8 +59,7 @@ def notification_mode(requested="auto"):
         mode = "auto"
     if mode != "auto":
         return mode
-    client = os.environ.get("AGENTDEV_CLIENT", "").lower()
-    return "none" if client == "claude" or (not client and os.environ.get("CLAUDECODE")) else "system"
+    return "system"
 
 
 def desktop_notify(title, text):
@@ -136,7 +135,6 @@ class UpdateTask:
             "log_path": str((self.home / "logs" / f"update-{task_id}.log").absolute()),
         }
         Path(self.value["log_path"]).parent.mkdir(parents=True, exist_ok=True)
-        self.started_notification = False
         self.stage("checking")
 
     def log(self, text):
@@ -149,13 +147,6 @@ class UpdateTask:
         message = f"AgentDevWorkSpace · {STAGES.get(stage, stage)}"
         self.log(message)
         print(message, flush=True)
-
-    def announce(self):
-        if self.started_notification:
-            return
-        self.started_notification = True
-        if self.mode == "system":
-            desktop_notify("AgentDevWorkSpace", f"开始更新：{self.value['from_version']} → {self.value['to_version']}")
 
     def run(self, args, **kwargs):
         # 子进程完整输出写入安装级日志；终端只展示阶段，不往客户端界面刷屏。
@@ -177,7 +168,7 @@ class UpdateTask:
             text += f"；{error}"
         self.log(text)
         print(f"AgentDevWorkSpace · {text}\n更新日志：{self.value['log_path']}", flush=True)
-        if self.mode == "system":
+        if self.mode == "system" and result == "success":
             desktop_notify("AgentDevWorkSpace", text[:240])
 
 

@@ -82,19 +82,33 @@ class UpdateState(Sandbox):
             (self.home / 'update-status.json').write_text(text)
             self.assertIsNone(status.read_status(self.home))
 
-    def test_only_one_notification_pair_and_terminal_finish(self):
+    def test_only_success_notifies_once_after_completion_for_all_clients(self):
         with patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'system'}), \
                 patch.object(status, 'desktop_notify', return_value=True) as notify:
-            task = self.task()
-            task.announce()
-            task.announce()
-            task.stage('downloading')
-            task.stage('dependencies')
-            task.finish('failed', '下载失败')
-            task.finish('success')
-        self.assertEqual(notify.call_count, 2)
-        self.assertEqual(status.read_status(self.home)['result'], 'failed')
-        self.assertIn('下载失败', status.read_status(self.home)['error'])
+            for client in ('claude', 'codex', 'cli'):
+                with self.subTest(client=client), patch.dict(os.environ, {'AGENTDEV_CLIENT': client}):
+                    notify.reset_mock()
+                    task = self.task()
+                    task.stage('downloading')
+                    task.stage('dependencies')
+                    notify.assert_not_called()
+                    task.finish('success')
+                    task.finish('success')
+                    notify.assert_called_once()
+                    self.assertIn('更新成功', notify.call_args.args[1])
+                    self.assertEqual(status.read_status(self.home)['result'], 'success')
+
+    def test_failed_and_blocked_tasks_do_not_notify(self):
+        with patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'system'}), \
+                patch.object(status, 'desktop_notify') as notify:
+            for result in ('failed', 'blocked'):
+                with self.subTest(result=result):
+                    task = self.task()
+                    task.finish(result, '下载失败或异常改动')
+                    task.finish('success')
+                    self.assertEqual(status.read_status(self.home)['result'], result)
+                    self.assertIn('下载失败或异常改动', status.read_status(self.home)['error'])
+            notify.assert_not_called()
 
     def test_command_failures_do_not_leak_credential_arguments_to_state_or_toast(self):
         with patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'system'}), \
@@ -104,16 +118,27 @@ class UpdateState(Sandbox):
             task.finish('failed', subprocess.CalledProcessError(128, ['git', 'clone', 'https://secret-token@example.invalid/repo']))
         self.assertNotIn('secret-token', task.path.read_text())
         self.assertNotIn('secret-token', str(notify.call_args))
+        notify.assert_not_called()
         self.assertIn('退出码 128', status.read_status(self.home)['error'])
 
-    def test_auto_routes_claude_to_plugin_and_codex_to_system(self):
+    def test_auto_routes_all_clients_to_system_and_preserves_overrides(self):
         with patch.dict(os.environ, {}, clear=True):
-            for env, expected in (({'AGENTDEV_CLIENT':'claude'}, 'none'),
-                                  ({'AGENTDEV_CLIENT':'codex', 'CLAUDECODE':'1'}, 'system'),
-                                  ({'CLAUDECODE':'1'}, 'none'), ({}, 'system')):
+            for env in ({'AGENTDEV_CLIENT':'claude'}, {'AGENTDEV_CLIENT':'codex', 'CLAUDECODE':'1'},
+                        {'CLAUDECODE':'1'}, {}):
                 with patch.dict(os.environ, env, clear=True):
-                    self.assertEqual(status.notification_mode(), expected)
+                    self.assertEqual(status.notification_mode(), 'system')
             self.assertEqual(status.notification_mode('none'), 'none')
+            with patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'none'}):
+                self.assertEqual(status.notification_mode(), 'none')
+                self.assertEqual(status.notification_mode('system'), 'system')
+            with patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'invalid'}):
+                self.assertEqual(status.notification_mode(), 'system')
+
+    def test_disabled_notifications_remain_silent_on_success(self):
+        with patch.object(status, 'desktop_notify') as notify:
+            task = self.task(notify='none')
+            task.finish('success')
+            notify.assert_not_called()
 
     def test_mac_uses_fixed_script_and_argv_not_string_interpolation(self):
         text = '失败 " & do shell script "not-a-command'
@@ -170,8 +195,11 @@ class UpdateState(Sandbox):
         self.assertEqual(task.path.read_bytes(), before)
         with patch.object(command, 'installed', return_value=self.home / 'app'), \
                 patch.object(command, 'warn_installation', return_value=False), \
-                patch.object(command, 'read_version', return_value=(0,3,0)):
+                patch.object(command, 'read_version', return_value=(0,3,0)), \
+                patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'system'}), \
+                patch.object(status, 'desktop_notify') as notify:
             command.update(self.home, check_only=True, remote=(0,4,0))
+            notify.assert_not_called()
         self.assertEqual(task.path.read_bytes(), before)
 
     def test_watch_ends_at_writer_expiry_without_deleting_state(self):
@@ -193,8 +221,11 @@ class UpdateState(Sandbox):
         with patch.object(command, 'installed', return_value=self.home / 'app'), \
                 patch.object(command, 'warn_installation', return_value=False), \
                 patch.object(command, 'read_version', return_value=(0,4,0)), \
-                patch.object(command, 'refresh') as refresh:
+                patch.object(command, 'refresh') as refresh, \
+                patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'system'}), \
+                patch.object(status, 'desktop_notify') as notify:
             command.update(self.home, remote=(0,4,0))
+            notify.assert_not_called()
         refresh.assert_called_once()
         self.assertEqual(task.path.read_bytes(), before)
 
@@ -274,7 +305,7 @@ class SharedUpdateIntegration(Sandbox):
         self.assertIn('安装依赖', result.stdout)
         self.assertIn('刷新工作区', result.stdout)
         self.assertIn('Requirement', Path(value['log_path']).read_text())
-        self.assertTrue((self.home / 'app/plugins/claude-update/hooks/register.js').is_file())
+        self.assertFalse((self.home / 'app/plugins/claude-update').exists())
         self.assertEqual(installation_risk(self.home), ('', False))
         query = self.run_command([sys.executable, self.entry, 'update', '--status'])
         self.assertIn(value['task_id'], query.stdout)
@@ -329,7 +360,7 @@ class SharedUpdateIntegration(Sandbox):
                 outputs.append(out)
             self.assertEqual(sum('已更新到 0.4.0' in out for out in outputs), 1)
             self.assertEqual(len(list((self.home / 'logs').glob('update-*.log'))), 1)
-            self.assertEqual(len(notifications.read_text().splitlines()), 2)
+            self.assertEqual(len(notifications.read_text().splitlines()), 1)
             for project in projects:
                 self.assertTrue((project / 'agent-workspace/.agent/env/agentskill-path').is_file())
             self.assertEqual(status.read_status(self.home)['result'], 'success')

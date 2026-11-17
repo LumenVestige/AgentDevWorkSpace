@@ -36,8 +36,7 @@ AGENTDEV_TEST_WHEELS="$PWD/tests/workspace/wheels" \
 | 测试文件 | 方法数 | 验证的行为 |
 | --- | ---: | --- |
 | `test_agentdev.py` | 5 | adev 别名、参数与退出码转发、shell 激活（不再重载 setup 环境）、重装后入口 |
-| `test_update_status.py` | 21 | 原子 JSON/完整字段/失败清理、通知路由/macOS 参数/Linux 超时/无桌面与 SSH 降级、真实 Git 升级、并发两项目一组通知且各自刷新、自动 hook 共用状态、只读查询/到期退出、失败及风险终态 |
-| `test_claude_plugin.py` | 2 | 插件清单与模块路径；通过 Node.js 执行官方 Mod API 替身验证后台轮询、完成 10 秒清除、新任务计时器隔离、损坏文件降级和会话清理（23 项 JS 断言，不是真实客户端 UI 验收） |
+| `test_update_status.py` | 23 | 原子 JSON/完整字段/失败清理、两端统一通知路由、成功完成仅通知一次、失败/暂停/开始静默、开关覆盖、macOS 参数/Linux 超时/无桌面与 SSH 降级、真实 Git 升级、并发两项目仅一次完成通知且各自刷新、自动 hook 共用状态、只读查询/到期退出、失败及风险终态 |
 | `test_repository.py` | 31 | 真实 master 独立安装、完整树与 dirty 源保留、忽略私有文件、暂存/未暂存/删除/未跟踪、HEAD/分支、Git 异常/超时、旧快照迁移、worktree/symlink、CLI 与欢迎语风险、阻止覆盖及只读性；同版本补齐 .git、原 commit 恢复、异常保留阻断、错误基准拒绝、下载/元数据失败回滚、现有 Git 不替换、恢复后继续升级 |
 | `test_layout.py` | 7 | 移除 setup 及别名、帮助命令列表、command/lib 分层、旧 Python 入口转发 |
 | `test_version.py` | 10 | 每个接口独立 5 秒超时、API 限流与 HTTP/网络错误回退、响应内容校验 |
@@ -54,7 +53,7 @@ AGENTDEV_TEST_WHEELS="$PWD/tests/workspace/wheels" \
 ## 隔离与维护
 
 - 安装目录、profile、pip 缓存、源码副本、Git 远端和 HTTP 服务都由夹具创建；不安装到真实用户目录，不改真实 shell 配置，不向 GitHub 推送。
-- `AGENTDEV_NOTIFY=none` 默认禁止真实系统通知；通知用例使用 mock 或隔离的假 osascript/notify-send，不向真实桌面发消息。插件行为测试需要已有 Node.js，未安装时明确 skip，不自动安装。
+- `AGENTDEV_NOTIFY=none` 默认禁止真实系统通知；通知用例使用 mock 或隔离的假 osascript/notify-send，不向真实桌面发消息。
 - `AGENTDEV_HOME` 指向测试目录；Git 忽略系统/用户配置，剔除调用者的 Git 覆盖、Python/PIP 覆盖和 GitHub token。普通测试不访问外部版本源；只有运行器首次准备依赖需要网络。
 - 源码夹具固定为 `0.3.0`，升级项目版本不会改变断言。用例不依赖个人 SDD 文档、历史运行产物或开发者用户名。
 - `tests/workspace/` 已被 `.gitignore` 忽略；每个用例自动清理数据，venv、wheel 和手动保存的日志留在此目录供复用。不要提交这些运行产物。
@@ -70,10 +69,10 @@ tests/workspace/venv/bin/python -B tests/show_installation_risk.py
 
 脚本在隔离目录创建真实 master 仓库，依次打印 `git branch`、干净版本检查、完整欢迎语、手工改动后的 `update --check`、完整风险欢迎语及被暂停的 `update`。不是只输出测试 OK；退出码和风险文件名也会展示，结束后清理隔离目录。示例版本固定为 0.3.0/0.4.0，不表示本仓库当前发布版本。
 
-## 查看更新进度与 Claude 插件提示输出
+## 查看更新进度与状态输出
 
 ```sh
 tests/workspace/venv/bin/python -B tests/show_update_status.py
 ```
 
-真实本地 Git/隔离安装打印下载、依赖、安装切换、完成、状态查询、异常改动暂停及退出码；随后执行 Claude API 替身并打印实际渲染文本与 10 秒后清除值。测试版本固定为 0.3.0/0.4.0/0.5.0，不代表当前发布版本。不会联网升级或发送真实桌面通知。该脚本需要已有 Node.js，不安装任何全局依赖。
+真实本地 Git/隔离安装打印下载、依赖、安装切换、完成、状态查询、异常改动暂停及退出码。测试版本固定为 0.3.0/0.4.0/0.5.0，不代表当前发布版本。不会联网升级或发送真实桌面通知，不安装任何全局依赖。

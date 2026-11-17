@@ -1,6 +1,0 @@
-{
-  "name": "agentdev-update",
-  "version": "1.0.0",
-  "description": "Show AgentDevWorkSpace update progress under the prompt; clear the result after 10 seconds.",
-  "author": {"name": "AgentDevWorkSpace"}
-}

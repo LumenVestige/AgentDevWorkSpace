@@ -44,7 +44,6 @@ def update(home, check_only=False, project=None, remote=None, notify="auto", for
             error = "安装目录存在风险，已暂停更新；请先备份并处理本地改动"
             task.finish("blocked", error)
             raise RuntimeError(error)
-        task.announce()
         task.stage("downloading")
         with tempfile.TemporaryDirectory(prefix="update-", dir=home) as temporary:
             checkout = Path(temporary) / "source"
@@ -81,7 +80,7 @@ def register(commands):
     mode.add_argument("--check", action="store_true", help="只检查，不安装更新")
     mode.add_argument("--status", action="store_true", help="查看安装级更新状态和日志路径")
     parser.add_argument("--watch", action="store_true", help="配合 --status 持续查看，完成 10 秒后退出")
-    parser.add_argument("--notify", choices=("auto", "system", "none"), default="auto", help="通知方式；auto 下 Claude 由插件展示，其余使用系统通知")
+    parser.add_argument("--notify", choices=("auto", "system", "none"), default="auto", help="通知方式；auto 统一使用系统通知，仅更新成功完成时发送")
     parser.add_argument("--project", help=argparse.SUPPRESS)
     parser.add_argument("--remote", type=version, help=argparse.SUPPRESS)
     parser.set_defaults(handler=execute)

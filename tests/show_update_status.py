@@ -3,7 +3,6 @@
 import json
 import sys
 
-from support import ROOT
 from test_update_status import SharedUpdateIntegration
 
 
@@ -28,10 +27,10 @@ def main():
         case.git('commit', '-qm', '[update] next fixture', cwd=case.source)
         (case.base / 'remote-version').write_text('0.5.0')
         (case.home / 'app/README.md').write_text('UNEXPECTED MANUAL EDIT\n')
-        show('异常改动阻止覆盖', case.run_command([sys.executable, case.entry, 'update'], success=False))
+        project = case.make_project(git=False)
+        show('自动更新遇到异常改动时暂停', case.run_command(
+            [sys.executable, case.entry, 'update', '--project', project], success=False))
         show('被暂停任务的共享状态', case.run_command([sys.executable, case.entry, 'update', '--status']))
-        print('\n=== Claude 插件 API 替身输出（非真实 UI 验收） ===')
-        print(case.run_command(['node', ROOT / 'tests/test_claude_plugin.mjs']).stdout.rstrip())
     finally:
         case.doCleanups()
 

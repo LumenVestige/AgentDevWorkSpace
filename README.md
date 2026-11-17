@@ -80,25 +80,17 @@ agentdev update --status --watch  # 持续查看；结束结果保留至完成�
 agentdev update --notify none     # 本次不发系统通知
 ```
 
-`--notify auto|system|none` 默认 `auto`；`AGENTDEV_NOTIFY` 可设置默认方式，显式非 auto 参数优先。`AGENTDEV_CLIENT=claude|codex` 指明调用客户端，新注册的 hook 自动传递。`--status --watch` 输出普通文本，不擦除终端历史；10 秒清除指 Claude 插件的临时提示，日志与最终状态均保留。
+`--notify auto|system|none` 默认 `auto`，Claude、Codex 和普通 CLI 统一使用系统通知；`AGENTDEV_NOTIFY` 可设置默认方式，显式非 auto 参数优先。`AGENTDEV_CLIENT=claude|codex` 指明调用客户端，新注册的 hook 自动传递。`--status --watch` 输出普通文本，不擦除终端历史，完成后等待 10 秒退出；日志与最终状态均保留。
 
-### Claude Code：外置插件
+### Claude Code / Codex：系统通知
 
-提供 [`plugins/claude-update/`](plugins/claude-update/README.md) Mod 插件，通过官方 `session.start`、`clock.every/after`、`ui.status` 每秒刷新输入框下方的状态，不需要先发送聊天消息，不改原有状态栏设置。成功、失败、暂停按**任务完成时间 + 10 秒**清除，新的任务不会被旧计时器清除。需要支持 Mod 的 Claude Code（官方教程要求 v2.1.287+）；组织策略或安全模式可能禁用插件。
-
-```sh
-claude --plugin-dir "${AGENTDEV_HOME:-$HOME/.agent-dev-workspace}/app/plugins/claude-update"
-```
-
-这是手动加载示例，setup/init 不写全局 Claude 配置，也不自动安装插件。未加载时仍可使用 CLI 查询。自定义安装路径通过环境变量或项目内受管理安装指针发现。
-
-### Codex：系统通知
-
-Codex 不需要插件或客户端补丁。实际更新任务只发送开始与最终结果两条通知，避免按阶段刷屏；阶段细节可在 CLI/任务日志查看。
+两端均无需外置更新插件或客户端补丁。实际更新成功完成后只发送一条系统通知；开始和中间阶段不通知，失败、暂停、无需更新及只读检查也不通知。阶段细节和失败原因可在 CLI 状态查询及任务日志查看。
 
 - macOS：已有的 `osascript`，固定 AppleScript + 参数传入，不拼接脚本。
 - Linux：已有的 `notify-send`，请求 10000ms 超时；缺少通知工具/桌面环境、SSH 会话、通知服务不可用或发送超时均不影响更新，不自动安装依赖。
-- 系统通知由 OS/桌面策略控制，**不能跨平台保证精确 10 秒消失**；Claude 插件按本程序时间控制清除。
+- 系统通知由 OS/桌面策略控制，**不能跨平台保证精确 10 秒消失**。
+
+此前使用 `--plugin-dir …/plugins/claude-update` 的用户应移除该参数，直接运行 `claude`；通过官方插件管理器安装过旧插件的用户可在 `/plugin` 中卸载。更新不会修改全局 Claude 配置或宿主启动脚本。
 
 示例输出（版本仅为测试夹具）：
 
@@ -151,7 +143,7 @@ AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
 
 Codex、Claude 仅通过官方提供的 hook 回调或外置插件接入。不得修改宿主启动脚本或 shell 启动配置，也不得用同名函数、别名或命令包装器接管宿主启动。
 
-欢迎语由官方 SessionStart hook 输出，显示时机由客户端决定；不通过启动转发脚本保证输入首条消息前展示。hook 使用项目的 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），展示版本信息和 SDD 快捷命令。Claude 的更新进度可通过前述外置插件展示。
+欢迎语由官方 SessionStart hook 输出，显示时机由客户端决定；不通过启动转发脚本保证输入首条消息前展示。hook 使用项目的 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），展示版本信息和 SDD 快捷命令。更新成功完成后，两端统一发送系统通知。
 
 ## 版本与发布
 

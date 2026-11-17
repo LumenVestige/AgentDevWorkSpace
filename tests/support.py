@@ -55,7 +55,7 @@ def snapshot(root):
 def copy_source(target, version="0.3.0"):
     """Pin fixture versions so a future release never changes test expectations."""
     target.mkdir()
-    for name in ("scripts", "skills", "plugins"):
+    for name in ("scripts", "skills"):
         shutil.copytree(ROOT / name, target / name, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for name in ("AGENTS.md", "README.md", "agentdev", "adev", "setup.sh", "update.sh"):
         shutil.copy2(ROOT / name, target / name, follow_symlinks=False)
