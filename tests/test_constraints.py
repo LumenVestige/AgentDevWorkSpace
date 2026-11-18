@@ -8,7 +8,7 @@ class ConstraintLoading(Sandbox):
     def setUp(self):
         super().setUp()
         self.root = self.make_project()
-        self.specs = self.root / 'agent-workspace/test-owner/specs'
+        self.specs = self.root / 'agent-workspace/workers/test-owner/specs'
         self.specs.mkdir(parents=True)
         (self.specs / 'constraints.md').write_text('P1: PERSONAL RULE\n')
 
@@ -21,7 +21,7 @@ class ConstraintLoading(Sandbox):
         self.assertEqual(out['hookEventName'], 'SessionStart')
         self.assertIn('P1: PERSONAL RULE', out['additionalContext'])
         self.assertIn('通用开发约束', out['additionalContext'])
-        self.assertIn('agent-workspace/test-owner/specs/constraints.md', out['additionalContext'])
+        self.assertIn('agent-workspace/workers/test-owner/specs/constraints.md', out['additionalContext'])
 
     def test_custom_common_priority_and_extra_markdown_and_user_isolation(self):
         custom = self.root / 'agent-workspace/skills/custom/sdd'
@@ -29,7 +29,7 @@ class ConstraintLoading(Sandbox):
         (custom / 'constraints.md').write_text('CUSTOM COMMON')
         (custom / 'welcome.py').write_text('print("CUSTOM WELCOME")')
         (self.specs / 'extra.md').write_text('EXTRA RULE')
-        other = self.root / 'agent-workspace/other/specs'
+        other = self.root / 'agent-workspace/workers/other/specs'
         other.mkdir(parents=True)
         (other / 'constraints.md').write_text('OTHER PRIVATE RULE')
         text = self.load().stdout
@@ -70,3 +70,11 @@ class ConstraintLoading(Sandbox):
             self.assertEqual(len(loaders), 1)
             self.assertNotIn('matcher', loaders[0])
             self.assertIn('--client ' + ('claude' if client.startswith('.claude') else 'codex'), loaders[0]['hooks'][0]['command'])
+
+    def test_workers_constraints_are_not_mixed_with_legacy_same_user(self):
+        legacy = self.root / 'agent-workspace/test-owner/specs'
+        legacy.mkdir(parents=True)
+        (legacy / 'constraints.md').write_text('LEGACY PRIVATE RULE')
+        text = self.load().stdout
+        self.assertIn('PERSONAL RULE', text)
+        self.assertNotIn('LEGACY PRIVATE RULE', text)

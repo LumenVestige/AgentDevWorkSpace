@@ -7,24 +7,88 @@ from support import ROOT, Sandbox, snapshot
 
 
 class FixCommandTests(Sandbox):
+    def test_moves_all_legacy_workers_and_repairs_shared_constraint_links(self):
+        root = self.make_project()
+        for user in ('tony', 'sanyinchen'):
+            folder = root / 'agent-workspace' / user / 'change/001-example'
+            folder.mkdir(parents=True)
+            (folder / 'spec.md').write_bytes(b'[constraints](../../../skills/common/sdd/constraints.md)\r\n')
+            (folder / 'data.bin').write_bytes(b'\x00user-data')
+        self.invoke('fix', root)
+        for user in ('tony', 'sanyinchen'):
+            self.assertFalse((root / 'agent-workspace' / user).exists())
+            folder = root / 'agent-workspace/workers' / user / 'change/001-example'
+            self.assertEqual((folder / 'data.bin').read_bytes(), b'\x00user-data')
+            self.assertEqual((folder / 'spec.md').read_bytes(),
+                             b'[constraints](../../../../skills/common/sdd/constraints.md)\r\n')
+        before = snapshot(root)
+        self.invoke('fix', root)
+        self.assertEqual(snapshot(root), before)
+
+    def test_worker_conflicts_keep_both_versions_and_move_nonconflicting_files(self):
+        root = self.make_project()
+        old = root / 'agent-workspace/test-owner/notes'
+        new = root / 'agent-workspace/workers/test-owner/notes'
+        old.mkdir(parents=True)
+        new.mkdir(parents=True)
+        (old / 'same.md').write_text('OLD')
+        (new / 'same.md').write_text('NEW')
+        (old / 'extra.md').write_text('EXTRA')
+        result = self.invoke('fix', root, success=False)
+        self.assertIn('冲突', result.stdout + result.stderr)
+        self.assertEqual((old / 'same.md').read_text(), 'OLD')
+        self.assertEqual((new / 'same.md').read_text(), 'NEW')
+        self.assertEqual((new / 'extra.md').read_text(), 'EXTRA')
+
+    def test_workers_symlink_is_rejected_without_touching_its_target(self):
+        root = self.make_project()
+        self.legacy_note(root)
+        outside = self.base / 'unrelated'
+        outside.mkdir()
+        (root / 'agent-workspace/workers').symlink_to(outside, target_is_directory=True)
+        before = snapshot(root)
+        self.invoke('fix', root, success=False)
+        self.assertEqual(snapshot(root), before)
+        self.assertEqual(list(outside.iterdir()), [])
+
+    def test_check_reports_pending_personal_and_notes_migrations_read_only(self):
+        root = self.make_project()
+        self.legacy_note(root)
+        current = root / 'agent-workspace/workers/other/notes'
+        current.mkdir(parents=True)
+        (current / '26-11-17-10-20-31-other.md').write_text('OTHER NOTE')
+        before = snapshot(root)
+        result = self.invoke('check', root, success=False)
+        self.assertIn('agentdev fix', result.stdout)
+        self.assertIn('personal', result.stdout)
+        self.assertIn('Note', result.stdout)
+        self.assertEqual(snapshot(root), before)
+        self.invoke('fix', root)
+        self.assertTrue((current / 'large-scale-file-change/2026-11-17/10-20-31-other.md').is_file())
+        result = self.invoke('check', root, success=False)  # Fixture intentionally lacks hooks.
+        self.assertNotIn('agentdev fix', result.stdout)
+
     def invoke(self, *args, cwd=None, success=True):
         return self.run_command([sys.executable, '-B', ROOT / 'scripts/command/app.py', *args],
                                 cwd=cwd, success=success)
 
-    def legacy_note(self, root, name='26-11-17-10-20-30-topic.md', user='test-owner', content=b'# Note\r\n## Git \xe6\x8f\x90\xe4\xba\xa4\n```\nabcdef0 [fix] recorded\n```\n'):
+    def legacy_note(self, root, name='26-11-17-10-20-30-topic.md', user='test-owner', content=b'# Note\r\n'):
         path = root / 'agent-workspace' / user / 'notes' / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
         return path
 
+    def target_note(self, root):
+        return root / 'agent-workspace/workers/test-owner/notes/large-scale-file-change/2026-11-17/10-20-30-topic.md'
+
     def test_migration_preserves_content_and_is_idempotent(self):
         root = self.make_project()
         source = self.legacy_note(root)
-        target = source.parent / 'git-commit-change/2026-11-17/10-20-30-topic.md'
+        target = self.target_note(root)
         result = self.invoke('fix', cwd=root)
         self.assertIn('已迁移 1 个', result.stdout)
         self.assertFalse(source.exists())
-        self.assertEqual(target.read_bytes(), b'# Note\r\n## Git \xe6\x8f\x90\xe4\xba\xa4\n```\nabcdef0 [fix] recorded\n```\n')
+        self.assertEqual(target.read_bytes(), b'# Note\r\n')
         before = snapshot(root)
         self.assertIn('已迁移 0 个', self.invoke('fix', cwd=root).stdout)
         self.assertEqual(snapshot(root), before)
@@ -36,27 +100,32 @@ class FixCommandTests(Sandbox):
             with self.subTest(alias=alias):
                 source = self.legacy_note(root)
                 self.assertIn('已迁移 1 个', self.invoke(alias, root).stdout)
-                target = source.parent / 'git-commit-change/2026-11-17/10-20-30-topic.md'
-                self.assertEqual(target.read_bytes(), b'# Note\r\n## Git \xe6\x8f\x90\xe4\xba\xa4\n```\nabcdef0 [fix] recorded\n```\n')
+                target = self.target_note(root)
+                self.assertEqual(target.read_bytes(), b'# Note\r\n')
                 target.unlink()
         source = self.legacy_note(root)
         result = self.run_command([ROOT / 'adev', 'fix', root])
         self.assertIn('已迁移 1 个', result.stdout)
         self.assertFalse(source.exists())
 
-    def test_conflicts_unrelated_notes_and_other_users_are_preserved(self):
+    def test_conflicts_and_unrelated_notes_are_preserved(self):
         root = self.make_project()
         source = self.legacy_note(root)
-        target = source.parent / 'git-commit-change/2026-11-17/10-20-30-topic.md'
+        target = self.target_note(root)
         target.parent.mkdir(parents=True)
-        target.write_bytes(b'## Git \xe6\x8f\x90\xe4\xba\xa4\nabcdef0 [fix] existing target\n')
+        target.write_bytes(b'existing target')
         self.legacy_note(root, name='README.md')
-        self.legacy_note(root, user='other-user')
         self.legacy_note(root, name='undated-new-format.md')
         (source.parent / 'undated-directory').mkdir()
-        before = snapshot(root)
         result = self.invoke('fix', root)
         self.assertIn('目标已存在跳过 1 个', result.stdout)
+        notes = root / 'agent-workspace/workers/test-owner/notes'
+        self.assertEqual((notes / source.name).read_bytes(), b'# Note\r\n')
+        self.assertEqual(target.read_bytes(), b'existing target')
+        self.assertTrue((notes / 'README.md').exists())
+        self.assertTrue((notes / 'undated-new-format.md').exists())
+        before = snapshot(root)
+        self.invoke('fix', root)
         self.assertEqual(snapshot(root), before)
 
     def test_missing_notes_is_successful_noop(self):
@@ -105,7 +174,7 @@ class FixCommandTests(Sandbox):
                 result = self.run_command([*entry, root])
                 self.assertIn('已迁移 1 个', result.stdout)
                 self.assertFalse(source.exists())
-                (source.parent / 'git-commit-change/2026-11-17/10-20-30-topic.md').unlink()
+                self.target_note(root).unlink()
 
     def test_help_exposes_fix_and_directory_argument(self):
         self.assertIn('fix / --f', self.invoke('help').stdout)

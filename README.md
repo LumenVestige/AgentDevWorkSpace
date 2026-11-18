@@ -2,7 +2,7 @@
 
 通用 Agent 协作规范。具体规则见 [AGENTS.md](AGENTS.md)。
 
-## 安装与接入
+## 1. 安装与接入
 
 需要 Git 和 Python 3.9+。安装程序默认写入用户主目录的 `.agent-dev-workspace/`，不需要管理员权限；安装与项目初始化分开。
 macOS / Linux（bash / zsh）：
@@ -14,11 +14,7 @@ cd <项目根目录>
 agentdev init  # 自动初始化并检查环境，无需再执行 check
 ```
 
-fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 `source .../env.fish` 激活命令。普通 `sh setup.sh` 无法修改父终端 PATH，会输出本 shell 的激活命令；source 入口在当前会话自动生效。`--no-path` 只跳过持久 PATH 配置，显式 source 仍激活当前会话。
-
-当前仅支持 macOS 和 Linux。可在源码目录直接运行 `./agentdev` 或 `./adev`；setup 只负责全局安装，项目接入用 `agentdev init`，完成后自动检查环境。
-
-## agentdev 命令
+## 2. agentdev 命令
 
 `adev` 是 `agentdev` 的等价短命令，支持相同的子命令、参数与退出码，例如 `adev init`、`adev --i`。已有安装重新执行 `source setup.sh` 后即可使用。
 
@@ -30,15 +26,11 @@ fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 
 | `agentdev init [目录]` | `agentdev --i [目录]` | 调用 deps.sh 安装共享依赖，再初始化工作区并检查环境；失败返回非零 |
 | `agentdev update` | `agentdev --u` | 检查版本，强制覆盖安装目录改动并刷新当前工作区 |
 | `agentdev version` | `agentdev --v` | 展示本地与远端版本；查询失败时明确报错 |
-| `agentdev fix [目录]` | `agentdev --f [目录]` | 显式修复旧版 notes 目录及误分类，不覆盖已有文件 |
+| `agentdev fix [目录]` | `agentdev --f [目录]` | 迁移历史 personal 至 workers，并适配旧 Note，不覆盖冲突文件 |
 | `agentdev archive [目录]` | `agentdev --a [目录]` | 将较早的开发记录分组移入小写 archived 目录 |
-| `agentdev check [目录]` | `agentdev --c [目录]` | 只读检查安装目录改动、工作区和环境，不修复文件 |
+| `agentdev check [目录]` | `agentdev --c [目录]` | 只读检查环境和历史 personal/Note；需迁移时提示 fix |
 
-上表命令的旧单横线形式作为兼容别名保留。安装不属于 app 命令：`setup`、`-setup`、`--s` 已移除，请直接运行或 source 根目录的 `setup.sh`；帮助和示例使用上表规范。
-
-`agentdev update --check` 查询版本并只读检查安装仓库，不安装。`update.sh` 是独立更新入口，版本和源码都取主仓库 master 分支。未安装、Git/Python 缺失、版本查询或更新失败时返回非零，不显示成功。
-
-## 全局目录
+## 3. 安装目录
 
 ```text
 ~/.agent-dev-workspace/
@@ -54,19 +46,12 @@ fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 
 
 setup 只安装程序并准备共享 Python venv / pip，不执行 `deps.sh`，也不安装 json5 等 skill 依赖；依赖由 `agentdev init` 显式安装。重装 setup 不卸载已有依赖。
 
-setup 在 macOS/Linux 注册当前用户的 shell PATH（zsh 的 `.zshrc`，bash 的 `.bashrc`/登录配置，fish 的 config.fish）；不写系统目录或安装系统级依赖。可用 `source setup.sh --no-path` 跳过 PATH 修改，之后通过完整路径调用 `bin/agentdev` 或 `bin/adev` 。`AGENTDEV_HOME` 可指定安装目录；测试使用仓库内隔离目录，不修改真实主目录。
+- **安装**：setup 在 macOS/Linux 配置用户 shell PATH，`AGENTDEV_HOME` 指定安装目录。`source setup.sh --no-path` 跳过持久 PATH 配置，仍激活当前会话，也可用完整路径调用 `bin/agentdev` 或 `bin/adev`。Git 源码须在 master 分支，保留受控文件的未提交改动和非忽略未跟踪文件，后续检查会提示。忽略文件不复制。
+- **检查**：`agentdev check`、`agentdev version`、`agentdev update`（含 `--check`）和欢迎语均检查安装目录的暂存、未暂存、删除、未跟踪文件及分支、HEAD 与安装基准的差异，不计业务项目改动。远端查询失败仍提示本地风险。`check` 离线检查，安装有风险时返回非零，仍完成工作区和环境检查。未全局安装时只查工作区。
+- **更新**：手动 `agentdev update`（或 `adev update`）同版本也可强制重装，丢弃安装目录的修改、删除和未跟踪文件，干净同版只刷新工作区。欢迎语和 hook 自动更新不覆盖风险安装。更新按 `install.json` 中的仓库下载 master、校验版本，失败保留原程序。项目配置、custom skills、个人约束、Note 和旧本地 venv 均保留。安装目录内执行 update 不会初始化为业务项目。
+- **旧安装**：缺 `.git` 表示“无法检查”，可用 `agentdev update` 补齐，同版本且干净时只恢复元数据。发现改动后手动更新可覆盖，自动更新暂停。无 commit 的旧快照有新版时仍可升级，也可从 master 源码执行 setup.sh 重装。
 
-setup 从 Git 源码安装时要求当前分支为 master。安装目录保留完整 Git 工作树与独立 `.git`，仅克隆 master（浅克隆、无其他分支或标签），不依赖原源码/更新临时目录的对象。源码中尚未提交的受控文件改动和非忽略未跟踪文件会保留，不会伪造提交；被忽略的私有配置、环境不复制。使用带本地改动的源码安装，之后也会收到安装目录改动提示。
-
-`agentdev check`、`agentdev version`、`agentdev update`（含 `--check`）和欢迎语版本检查同时检测安装目录的已暂存/未暂存/删除/未跟踪文件，并将分支及 HEAD 与安装基准比较。异常会展示“异常改动”风险提示和文件名，以及“执行[agentdev update]进行强制覆盖更新。”；即使远端版本查询失败，本地风险也会展示。`check` 不查询远端，发现安装风险时返回非零，仍完成工作区和环境检查；尚未全局安装时只检查工作区。标记文件与 Python 字节码不会导致正常安装误报，当前业务项目的改动不计入安装风险。
-
-手动执行 `agentdev update`（或 `adev update`）允许强制覆盖安装目录改动：同版本发现改动时也会从 master 下载、校验并重新安装，丢弃安装目录的修改、删除和未跟踪文件；干净的同版本安装仍只刷新工作区。自动更新继续保留风险保护，欢迎语发现风险时不启动后台覆盖，hook 的内部 `--project` 调用也不会覆盖风险安装。
-
-旧安装或归档源码没有 `.git` 时明确提示“无法检查”，不是“目录干净”；同版本先补齐独立的 master `.git`，安装干净时仅恢复元数据。有安装 commit 时恢复原基准；没有 commit 时要求 master 与安装版本一致，否则拒绝附加错误基准。补齐后发现异常改动，手动更新继续覆盖安装，自动更新暂停。元数据修复本身不替换已有 `.git`，手动强制重新安装可整体替换风险安装。无 commit 的旧快照在真正有新版时仍兼容原来的完整升级迁移，也可从 master 源码执行 setup.sh 重装。
-
-更新仍根据 `install.json` 记录的 Git 仓库和远端版本，临时克隆 master、验证版本后替换 `app/`，失败保留原程序和可重试状态。安装与更新使用全局互斥锁。保留项目的配置、custom skills、个人约束和 Note；旧项目本地 venv 不删除。在安装目录本身执行 update 不会把它初始化为业务项目。
-
-## 更新进度与通知
+## 4. 更新进度与通知
 
 手动 `agentdev update` 与欢迎语/Stop hook 的后台更新使用同一个安装级任务：
 
@@ -86,7 +71,7 @@ agentdev update --notify none     # 本次不发系统通知
 
 `--notify auto|system|none` 默认 `auto`，Claude、Codex 和普通 CLI 统一使用系统通知；`AGENTDEV_NOTIFY` 可设置默认方式，显式非 auto 参数优先。`AGENTDEV_CLIENT=claude|codex` 指明调用客户端，新注册的 hook 自动传递。`--status --watch` 输出普通文本，不擦除终端历史，完成后等待 10 秒退出；日志与最终状态均保留。
 
-### Claude Code / Codex：系统通知
+### 4.1 Claude Code / Codex：系统通知
 
 两端均无需外置更新插件或客户端补丁。实际更新成功完成后只发送一条系统通知；开始和中间阶段不通知，失败、暂停、无需更新及只读检查也不通知。阶段细节和失败原因可在 CLI 状态查询及任务日志查看。
 
@@ -106,51 +91,53 @@ AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
 更新日志：<安装根目录>/logs/update-<task_id>.log
 ```
 
-## 工作区初始化与检查
+## 5. 工作区初始化与检查
 
 `agentdev init` 先显式执行安装源码中的 `scripts/lib/deps.sh`，将固定版本依赖安装到全局共享 `venv/`（使用安装级 pip 缓存），完整验证后才在当前目录创建 `agent-workspace/`，不要求工具位于项目内部。支持 Git 仓库根目录和非 Git 目录；在已有 Git 仓库的子目录执行时会提示切换到仓库根目录，避免创建嵌套工作区。Git 项目未配置 personal 时须设置 `git user.name`；非 Git 项目默认使用电脑用户名，不依赖 Git 用户配置。
 
 - 依赖安装失败或超时返回非零，不继续创建或刷新工作区；`check` 和 `fix` 不触发依赖安装。`update` 保留原有依赖安装与环境验证，刷新工作区时也遵循 init 流程。
 - `skills/common/` 每次从全局模板整体刷新；`skills/custom/` 保留，同名时优先。
-- 按统一命名规则创建个人目录、`specs/constraints.md` 和 `notes/`，保留已有内容；不再自动迁移旧版平铺 Note，迁移须显式运行 `agentdev fix`。
+- 按统一命名规则在 `agent-workspace/workers/<personal>/` 创建个人目录、`specs/constraints.md` 和 `notes/`，保留已有内容；不再自动迁移旧版平铺 Note，迁移须显式运行 `agentdev fix`。
 - `config/config.json5` 不存在时从模板复制；`.agent/env/python-path` 和 `agentskill-path` 记录共享解释器及全局程序位置。
 - 保留项目原有 `AGENTS.md` 内容，标记块只引用 `agent-workspace/AGENTS.md`，通用规则同步到该独立文件，不再追加规则全文；再次初始化会替换旧的受管明文块，并迁移未被用户修改的受管入口。用户自建符号链接和已修改的受管副本保持不变。链接 `CLAUDE.md` 和 `.claude/skills/`；链接不可用时复制，并保留复制后被用户修改的文件。
 - 注册 Claude Code 和 Codex 的 Stop / SessionStart hook，保留其他 hook；由共享 Python 启动器选择 custom 优先的脚本。Codex 中仍需由用户信任项目及 hook。
 - Git 项目安装提交标签校验 hook（已有其他 hook 时保留）；非 Git 项目跳过。SDD 快捷脚本直接使用本机 POSIX shell。
 - `.gitignore` 忽略工作区配置、`.agent/` 和个人约束；工具生成的客户端配置和链接不纳入 Git。
 
-`agentdev check` 不修复或写入文件；它检查当前目录是否存在有效工作区、安装路径和解释器是否可用、Python 3.9+/venv/pip/依赖版本、Note 配置格式以及必要 hook。缺项会列出并返回非零。`agentdev init` 已自动执行该检查，日常初始化无需再手动 check。更新后自动刷新当前工作区；其他项目可重新执行 `agentdev init` 同步模板。
+`agentdev check` 不修复或写入文件；它检查当前目录是否存在有效工作区、安装路径和解释器是否可用、Python 3.9+/venv/pip/依赖版本、Note 配置格式以及必要 hook。环境缺项或发现历史 personal/Note 待迁移时列出并返回非零；待迁移项提示运行 `agentdev fix`。检测不会修改文件，暂不包含归档检测。`agentdev init` 已自动执行该检查，日常初始化无需再手动 check。更新后自动刷新当前工作区；其他项目可重新执行 `agentdev init` 同步模板。
 
 在 AgentDevWorkSpace 自身的源码根目录中，`update` 刷新工作区时不会创建、追加或替换 `AGENTS.md` 和 `.gitignore`；skills、环境指针及 hook 仍正常同步，手动 `init` 也遵循相同保护。源码目录通过 Git remote URL 识别（任意 remote 指向主仓库即可，兼容 HTTPS、SSH/SCP 与 git 协议、可选 `.git` 后缀），不依赖目录名或源码文件布局，并排除带 `.agentdev-app` 标记的受管理安装；普通项目保持原有行为。此前已写入这两个文件的内容不会自动清理。
 
 兼容旧版更新器与尚未刷新的 hook，`scripts/agentdev.py`、`scripts/run_skill.py` 仅保留薄转发入口，`scripts/setup.sh`、`scripts/deps.sh` 仅保留链接；实际实现均位于 `command/` 或 `lib/`，不会重新开放 app 的 setup 命令。
 
-## 修复旧版 notes 目录
+## 修复历史 personal 与 Note
 
 ```sh
-agentdev fix            # 修复当前工作区（adev fix 等价）
+agentdev fix                  # 修复当前工作区（adev fix 等价）
 agentdev fix /path/to/project  # 修复指定工作区；也可用 --f / -fix
 ```
 
-`fix` 独立于 `setup`、`init` 和 `update`，只处理当前配置用户的 Note：
+`fix` 独立于 `setup`、`init` 和 `update`，按顺序处理：
 
-- 识别 `yy-MM-dd-<topic>.md`、`yy-MM-dd-HH-mm-ss-<topic>.md` 和日期前缀主题目录，也支持四位年份；日期必须有效。
-- 按正文的 `## Git 提交`（兼容 `Commits` / `提交记录`）中实际的提交 hash 行分类：有提交记录进入 `git-commit-change`，没有则进入 `large-scale-file-change`；模板占位、诊断 SHA-256 或行内提及旧提交不作为提交记录。
-- 去掉名称中的日期前缀，放进对应类型的 `YYYY-MM-DD/`；保留时分秒和主题名称。目录整体移动，附件和内容不变。
-- 同时纠正旧版 fix 错放在 `git-commit-change/YYYY-MM-DD/` 下的非提交记录；不扫描 archived 分组。
-- 只处理当前 `personal`（兼容 `peronsal`，未配置时使用默认用户名）；其他用户和无日期的无关文件不动。
-- 目标重名时保留源和目标并输出路径；不沿符号链接迁移，可重复执行。
+1. 将 `agent-workspace/<personal>/` 迁移到 `agent-workspace/workers/<personal>/`。处理配置用户及包含 specs、notes、feature、bugfix、change、research 的历史个人目录，跳过 skills、config、.agent、workers 和无关目录；迁移所有可识别用户，保留个人目录名称。
+2. 识别各用户 notes 下两位/四位年份的有效日期前缀文件和主题目录，可带时分秒；去掉日期前缀，放进对应类型的 `YYYY-MM-DD/`，目录整体移动、附件和内容不变。
+3. 按 `## Git 提交`（兼容 `Commits` / `提交记录`）节中的实际提交 hash 行分类：有提交记录进入 `git-commit-change`，没有则进入 `large-scale-file-change`。模板占位、诊断 SHA-256 或行内提及旧提交不算提交记录。
+4. 纠正旧版 fix 错放在 `git-commit-change/YYYY-MM-DD/` 下的非提交记录；不扫描 archived 分组。
 
-旧 `scripts/lib/fix.py` / `fix.sh` 入口保留兼容；初始化和更新不再隐式执行 Note 迁移，其他配置与安装兼容迁移不受影响。
+fix 适配所有可识别用户；archive 和个人约束加载仅针对当前配置用户。
 
-## 开发记录分组归档
+目标目录已存在时逐项合并，不覆盖任何同名文件；个人文件冲突保留两边并返回非零，处理后可重试。旧 Note 的归档目标已存在时跳过并保留源文件。迁移同时修正 Markdown 中指向共享 skills 的相对链接，保留其他内容；目录符号链接不作为迁移入口或目标。
+
+无历史数据时成功且不写文件。目录不存在、没有 `agent-workspace/` 或配置错误时返回非零，不初始化、安装或更新。旧 `scripts/lib/fix.py` / `fix.sh` 入口保留兼容。init/update 不隐式迁移个人目录或 Note；`check` 与欢迎语只读检测并提示 `agentdev fix`。
+
+## 6. 开发记录分组归档
 
 ```sh
 agentdev archive                 # adev archive 等价；也可用 --a / -archive
 agentdev archive /path/to/project
 ```
 
-仅整理当前用户的 `feature`、`bugfix`、`change`、`research`、`notes/git-commit-change` 和
+仅整理当前 `agent-workspace/workers/<personal>/` 用户目录的 `feature`、`bugfix`、`change`、`research`、`notes/git-commit-change` 和
 `notes/large-scale-file-change` 六个目录，不由 setup/init/update 自动触发。
 每个目录的直接文件/子目录超过 N 时，保留按名称排序最新的 N 项，将较早的超出部分按名称顺序移入
 该目录的小写 `archived/01/`、`archived/02/`…，每组最多 M 项；补满最后一个组后再增加编号。
@@ -164,9 +151,9 @@ SDD 新编号/同名检查、布局检查和知识检索覆盖已归档需求；
 { archive: { threshold: 50, group_size: 100 } }
 ```
 
-## 个人目录与统一配置
+## 7. 个人目录与统一配置
 
-配置路径为 `agent-workspace/config/config.json5`，例如：
+个人目录统一位于 `agent-workspace/workers/<personal>/`。配置路径为 `agent-workspace/config/config.json5`，例如：
 
 ```json5
 {
@@ -179,26 +166,26 @@ SDD 新编号/同名检查、布局检查和知识检索覆盖已归档需求；
 - `personal` 非空时优先，兼容拼写 `peronsal`；两者都填写时以 `personal` 为准。
 - 默认 Git 仓库根目录取 `git user.name`，非 Git 目录取当前电脑用户名，统一转小写并把空格、标点换成 `-`。
 - 禁止路径、空目录名、工作区保留目录名。
-- 修改后，后续 init、SDD、Note 和 layout 使用新名称；旧个人目录及其数据不迁移、不合并、不删除。新增需求时会补齐新目录的个人约束模板。
+- 仅修改 personal 配置时，后续 init、SDD、Note 和 layout 使用新名称，不自动重命名其他个人目录。历史层级迁移通过 `agentdev fix` 显式执行；新增需求时会补齐新目录的个人约束模板。
 - init 会把旧 `notes.json5` 更名为 `config.json5`，保留内容和注释；两者并存时新文件优先，旧文件不覆盖或合并。
 - 无论是否是 Git 仓库，init 都会正常创建或补充 `.gitignore`，保留已有条目。
 
-## 个人开发约束
+### 个人开发约束
 
-`agent-workspace/<personal>/specs/constraints.md` 及同目录树内其他 Markdown 文件通过独立的
+`agent-workspace/workers/<personal>/specs/constraints.md` 及同目录树内其他 Markdown 文件通过独立的
 `SessionStart` hook 加载进 Agent 上下文，按当前配置选择用户，不读取其他用户或符号链接目标。
 通用约束优先使用 `skills/custom/sdd/constraints.md`，没有时使用 common；通用约束优先于个人约束。
 启动、恢复、clear 和 compact 后均加载，不因自定义欢迎语被绕过；配置或文件读取错误明确报告。
 升级源码后需在目标项目执行 `agentdev init` 或更新工作区来同步 skill 和 hook；既有约束内容不会被覆盖。
 每次开发任务仍需读取最新源文件，尤其是会话内修改约束后。hook 提供约束上下文，不对任意自然语言规则作自动语义验证；spec/plan 仍须逐项检查。
 
-## 宿主接入与欢迎语
+## 8. 宿主接入与欢迎语
 
 Codex、Claude 仅通过官方提供的 hook 回调或外置插件接入。不得修改宿主启动脚本或 shell 启动配置，也不得用同名函数、别名或命令包装器接管宿主启动。
 
-欢迎语由官方 SessionStart hook 输出，显示时机由客户端决定；不通过启动转发脚本保证输入首条消息前展示。hook 使用项目的 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），展示版本信息和 SDD 快捷命令。更新成功完成后，两端统一发送系统通知。
+欢迎语由官方 SessionStart hook 输出，显示时机由客户端决定；不通过启动转发脚本保证输入首条消息前展示。hook 使用项目的 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），展示版本信息和 SDD 快捷命令。欢迎语同时运行只读 `check`，展示环境及历史数据迁移提示；发现待迁移项时提示 `agentdev fix`。更新成功完成后，两端统一发送系统通知。
 
-## 版本与发布
+## 9. 版本与发布
 
 唯一版本源是[主仓库 master 分支的 publish/version](https://github.com/LumenVestige/AgentDevWorkSpace/blob/master/publish/version)。CLI `version` / `update`、欢迎语和自动更新使用同一解析与读取逻辑，优先通过同文件的 GitHub contents API 获取，失败时回退到原始文件地址，不依赖外部版本仓库。
 
@@ -214,11 +201,11 @@ sh publish/publish.sh "[update] 发布版本 1.0.0" 1.0.0
 
 发布只修改本仓库的 `publish/version`，按标签规则提交全部未忽略的改动，再推送本仓库当前分支。提交失败恢复版本文件；推送失败保留已完成的提交并明确返回错误。没有第二仓库的 clone、pull、版本对齐、提交或 push。
 
-旧配置中的废弃版本地址在读取时映射为主仓库版本文件，`init` 会在保留其他设置和注释的同时替换实际配置值。`check` 保持只读。旧整数/小数版安装应先同步新源码并重新运行 setup 和 init，使所有入口使用三段版本；已有 personal 目录仍不迁移。
+旧配置中的废弃版本地址在读取时映射为主仓库版本文件，`init` 会在保留其他设置和注释的同时替换实际配置值。`check` 保持只读。旧整数/小数版安装应先同步新源码并重新运行 setup 和 init，使所有入口使用三段版本；已有 personal 目录通过 `agentdev fix` 显式迁移到 workers/。
 
 私有仓库可通过现有 `GITHUB_TOKEN` / `GH_TOKEN` 环境变量读取版本；令牌仅发送给对应主仓库的 GitHub API，不发送给自定义地址。`AGENTDEV_VERSION_URL` 可指定验证用文件/HTTP 地址。
 
-## 文件列表
+## 10. 文件列表
 
 `skills/` 是通用 skill 模板包，安装时复制到项目的 `agent-workspace/skills/common/`，Agent 和 hook 都使用工作区中的副本。
 
@@ -230,7 +217,7 @@ update.sh                  独立更新入口
 scripts/command/app.py     CLI 参数解析与命令分发
 scripts/command/           help / init / check / fix / archive / update / version 的实现
 scripts/command/*.sh       init / check / update 的 shell 入口及 Codex 启动器
-scripts/lib/fix.py, fix.sh  旧版 notes 迁移及兼容入口
+scripts/lib/fix.py, fix.sh  历史 personal / Note 迁移及兼容入口
 scripts/lib/installer.py   全局安装、运行时、PATH 与安装锁
 scripts/lib/repository.py  独立 master 工作树安装与 Git 改动风险检查
 scripts/lib/setup.py       仅供根 setup.sh 调用的安装实现
@@ -244,9 +231,9 @@ skills/git-commit/SKILL.md      git-commit skill：提交信息规则
 skills/git-commit/commit-msg    提交标签校验（commit-msg hook）
 skills/sdd/SKILL.md             sdd skill：SDD 流程、需求目录与编号规则
 skills/sdd/constraints.md       通用开发约束规范
-skills/sdd/load_constraints.py  独立 SessionStart hook，加载当前用户 specs/**/*.md 和 custom 优先的通用约束
-skills/sdd/personal-constraints.md  个人约束模板（复制到 <个人目录>/specs/constraints.md）
-skills/sdd/new.sh               创建 <个人目录>/<feature|bugfix|change|research>/NNN-<slug>/ 并复制该类型的模板
+skills/sdd/load_constraints.py  独立 SessionStart hook，加载当前用户 specs/**/*.md 和 custom 优先通用约束
+skills/sdd/personal-constraints.md  个人约束模板（复制到 workers/<个人目录>/specs/constraints.md）
+skills/sdd/new.sh               创建 workers/<个人目录>/<feature|bugfix|change|research>/NNN-<slug>/ 并复制该类型的模板
 skills/sdd/new_feature.sh, new_bugfix.sh, new_change.sh, new_research.sh  快捷命令「创建feature/bugfix/change/research:<名称>」对应的入口
 skills/sdd/welcome.md, welcome.py  SessionStart hook：新对话时展示 SDD 快捷命令
 skills/sdd/render_welcome.py       欢迎语表格与终端配色，供 hook 和 CLI 入口共用
@@ -263,3 +250,7 @@ skills/_workspace_config.py     统一配置读取、personal/peronsal 和旧版
 skills/_version.py              三段版本解析、比较、主仓库文件查询与旧格式读取
 skills/notes/common.py          notes 脚本共用：根目录定位、个人目录、Note 类型与目录、配置读取、未记录提交与工作区改动扫描
 ```
+
+---
+
+本文由 AgentWorkFlow 生成

@@ -235,6 +235,20 @@ def is_source_repository(project):
     )
 
 
+def refresh_common(source, ws):
+    """使用模板源整体刷新 common，保留 custom 和工作区运行时配置。"""
+    common = ws / "skills/common"
+    with tempfile.TemporaryDirectory(prefix="skills-", dir=ws / ".agent/tmp") as temporary:
+        staged = Path(temporary) / "common"
+        shutil.copytree(source / "skills", staged, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
+        if common.is_symlink():
+            common.unlink()
+        elif common.exists():
+            common.rename(Path(temporary) / "previous")
+        staged.rename(common)
+    return common
+
+
 def initialize(source, home, project):
     project = project.absolute().resolve()
     if not project.is_dir():
@@ -254,21 +268,13 @@ def initialize(source, home, project):
     configs = {path: load_json(path) for path in (project / ".claude/settings.local.json", project / ".codex/hooks.json")}
     ws = project / "agent-workspace"
     env = ws / ".agent/env"
-    for path in (env, ws / ".agent/tmp", ws / ".agent/profiles", ws / ".agent/evals", ws / "skills/custom", ws / "config", ws / user / "specs", ws / user / "notes"):
+    for path in (env, ws / ".agent/tmp", ws / ".agent/profiles", ws / ".agent/evals", ws / "skills/custom", ws / "config", ws / "workers" / user / "specs", ws / "workers" / user / "notes"):
         path.mkdir(parents=True, exist_ok=True)
-    common = ws / "skills/common"
-    with tempfile.TemporaryDirectory(prefix="skills-", dir=ws / ".agent/tmp") as temporary:
-        staged = Path(temporary) / "common"
-        shutil.copytree(source / "skills", staged, ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-        if common.is_symlink():
-            common.unlink()
-        elif common.exists():
-            common.rename(Path(temporary) / "previous")
-        staged.rename(common)
+    common = refresh_common(source, ws)
     if not any((ws / "skills/custom").iterdir()):
         (ws / "skills/custom/.gitkeep").touch()
     sdd = ws / "skills/custom/sdd" if (ws / "skills/custom/sdd").is_dir() else common / "sdd"
-    constraint = ws / user / "specs/constraints.md"
+    constraint = ws / "workers" / user / "specs/constraints.md"
     if not constraint.exists():
         shutil.copy2(sdd / "personal-constraints.md", constraint)
     config = ws / "config/config.json5"
@@ -300,7 +306,7 @@ def initialize(source, home, project):
         link_or_copy(project / ".claude/skills" / name, target, managed)
     write_if_changed(env / "managed-links.json", json.dumps(managed, indent=2, ensure_ascii=False) + "\n")
     if not source_repository:
-        append_lines(project / ".gitignore", ["/agent-workspace/config/", "/agent-workspace/.agent/", "/agent-workspace/.agent/tmp/", "/agent-workspace/*/specs/"])
+        append_lines(project / ".gitignore", ["/agent-workspace/config/", "/agent-workspace/.agent/", "/agent-workspace/.agent/tmp/", "/agent-workspace/workers/*/specs/", "/agent-workspace/*/specs/"])
     if git_root:
         exclude = Path(git(project, "rev-parse", "--git-path", "info/exclude"))
         exclude = exclude if exclude.is_absolute() else project / exclude
@@ -313,13 +319,15 @@ def initialize(source, home, project):
         git(project, "config", "agentskill.python", str(py))
     for path, cfg in configs.items():
         register_hooks(path, cfg, py, source, project)
-    print(f"已初始化：{project}（agent-workspace/{user}，共享运行时 {py}）")
+    print(f"已初始化：{project}（agent-workspace/workers/{user}，共享运行时 {py}）")
     print("Codex 首次使用项目 hook 时，请在客户端中信任本项目及相关 hook。")
 
 
 def check_workspace(project):
+    from .fix import migration_issues
     project = project.absolute().resolve()
     ws, errors = project / "agent-workspace", []
+    user = None
     if not shutil.which("git"):
         errors.append("Git 不可用，请先安装 Git 并加入 PATH")
     for scripts in SCRIPTS.values():
@@ -341,7 +349,7 @@ def check_workspace(project):
                     errors.append("缺少工作区配置 config.json5")
                 else:
                     try:
-                        project_settings(project, py, source)
+                        user = project_settings(project, py, source)["personal"]
                     except ValueError as error:
                         errors.append(f"config.json5 配置格式错误：{error}")
         else:
@@ -358,6 +366,10 @@ def check_workspace(project):
                         errors.append(f"缺少 hook：{path.name} {event} {script}")
         except (OSError, ValueError) as error:
             errors.append(f"hook 配置错误：{error}")
+    pending = migration_issues(project, user)
+    if pending:
+        errors.extend(pending)
+        errors.append("请执行 agentdev fix 进行迁移；check 不会移动文件。")
     for error in errors:
         print(f"✗ {error}")
     if not errors:

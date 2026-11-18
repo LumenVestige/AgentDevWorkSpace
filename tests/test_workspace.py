@@ -121,7 +121,7 @@ class SourceWorkspaceTests(unittest.TestCase):
         project = self.project("AgentDevWorkSpace", source=False)
         self.update(project, self.version)
         self.assert_agent_reference(project)
-        self.assertIn("/agent-workspace/*/specs/", (project / ".gitignore").read_text())
+        self.assertIn("/agent-workspace/workers/*/specs/", (project / ".gitignore").read_text())
         self.assert_workspace_refreshed(project)
 
     def assert_agent_reference(self, project):

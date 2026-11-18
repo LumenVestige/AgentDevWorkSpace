@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""检查需求目录（agent-workspace/<个人目录>/<feature|bugfix|change|research>/NNN-<slug>/）中的文件是否已归类。
+"""检查需求目录（agent-workspace/workers/<个人目录>/<feature|bugfix|change|research>/NNN-<slug>/）中的文件是否已归类。
 
 规则（见本目录 SKILL.md「需求目录内的文件」）：
 - 根目录只放 spec.md、plan.md、tasks.md、summary.md；
@@ -79,16 +79,18 @@ def problems(paths, base):
     """按需求目录归并不合规的文件：{需求目录: [(相对需求目录的路径, 原因)]}。"""
     found = {}
     for path in sorted(paths):
-        parts = Path(path).parts
-        # agent-workspace/<个人目录>/<类型>/<NNN-slug>/...
-        if len(parts) < 5 or parts[2] not in TYPES:
+        try:
+            parts = Path(path).relative_to(base).parts
+        except ValueError:
             continue
-        index = 5 if parts[3] == "archived" and len(parts) >= 7 and re.fullmatch(r"[0-9]{2,}", parts[4]) else 3
+        if len(parts) < 3 or parts[0] not in TYPES:
+            continue
+        index = 3 if parts[1] == "archived" and len(parts) >= 5 and re.fullmatch(r"[0-9]{2,}", parts[2]) else 1
         if not REQ_DIR.match(parts[index]):
             continue
         if any(p in JUNK for p in parts[index + 1:]):
             continue
-        req, rest = "/".join(parts[:index + 1]), parts[index + 1:]
+        req, rest = str(Path(base).joinpath(*parts[:index + 1])), parts[index + 1:]
         if len(rest) == 1:
             if rest[0] in ROOT_FILES:
                 continue
@@ -121,7 +123,7 @@ def main():
     root = here.parents[4]
     is_git = git(root, "rev-parse", "--is-inside-work-tree") is not None
     user = user_dir_name(root)
-    base = f"agent-workspace/{user}"
+    base = f"agent-workspace/workers/{user}"
     if not user or not (root / base).is_dir():
         return 0
     found = problems(all_files(root, base) if manual or not is_git else new_files(root, base), base)

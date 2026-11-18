@@ -80,14 +80,15 @@ search_tree() {
   total=$((total + n))
 }
 
-W=agent-workspace
+for W in agent-workspace/workers agent-workspace; do
 search_tree "功能 feature" $W/*/feature
 search_tree "bug 修复 bugfix" $W/*/bugfix
 search_tree "变更 change" $W/*/change
 search_tree "调研 research" $W/*/research
 search_tree "Note" $W/*/notes
-search "约束" $W/skills/custom/sdd/constraints.md $W/skills/common/sdd/constraints.md
 search_tree "个人约束" $W/*/specs
+done
+search "通用约束" agent-workspace/skills/custom/sdd/constraints.md agent-workspace/skills/common/sdd/constraints.md
 
 # 提交信息：全部关键词都出现的提交，最多 20 条。
 if git rev-parse --git-dir >/dev/null 2>&1; then

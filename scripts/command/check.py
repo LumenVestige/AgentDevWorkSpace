@@ -6,7 +6,7 @@ from lib.workspace import check_workspace
 
 
 def register(commands):
-    parser = commands.add_parser("check", help="只读检查安装目录改动、当前工作区与 Python / pip / json5 / hook")
+    parser = commands.add_parser("check", help="只读检查环境、hook 及历史 personal/Note 迁移，待迁移时提示 agentdev fix")
     parser.add_argument("directory", nargs="?", default=".")
     parser.set_defaults(handler=execute)
 

@@ -22,12 +22,16 @@ class SDD(Sandbox):
                 path = self.root / result.stdout.strip()
                 self.assertEqual(path.name, "001-用户-login-upgrade")
                 self.assertEqual(path.parent.name, kind)
+                self.assertEqual(path.parents[2].name, 'workers')
                 self.assertEqual({p.name for p in path.iterdir()}, {"spec.md", "plan.md", "tasks.md"})
                 spec = (path / "spec.md").read_text()
                 self.assertIn("用户 Login & Upgrade", spec)
                 self.assertIn("001", spec)
                 self.assertNotIn("<git user.name>", spec)
                 self.assertNotIn("<需求名称>", spec)
+                import re
+                target = re.search(r'\]\(([^)]+skills/[^)]+)\)', spec).group(1)
+                self.assertTrue((path / target).is_file())
                 self.assertIn("002-second", self.create(kind, "Second").stdout)
         self.assertIn("已全部归类", self.skill(self.root, "sdd/check_layout.py", "--all").stdout)
 
@@ -44,9 +48,15 @@ class SDD(Sandbox):
         self.assertEqual(len(list(path.parent.iterdir())), 1)
 
     def test_next_number_uses_maximum_with_gaps(self):
-        path = self.root / "agent-workspace/test-owner/feature/009-existing"
+        path = self.root / "agent-workspace/workers/test-owner/feature/009-existing"
         path.mkdir(parents=True)
         self.assertIn("/010-next", self.create("feature", "Next").stdout)
+
+    def test_numbering_also_accounts_for_unmigrated_requirements(self):
+        legacy = self.root / 'agent-workspace/test-owner/change/008-before-migration'
+        legacy.mkdir(parents=True)
+        self.assertIn('/009-after-migration', self.create('change', 'After Migration').stdout)
+        self.create('change', 'Before Migration', success=False)
 
     def test_custom_templates_and_constraints_take_priority(self):
         custom = self.root / "agent-workspace/skills/custom/sdd"
@@ -128,7 +138,7 @@ class Knowledge(Sandbox):
         super().setUp()
         self.root = self.make_project()
         self.script = self.root / "agent-workspace/skills/common/knowledge/search.sh"
-        self.req = self.root / "agent-workspace/alice/research/001-storage"
+        self.req = self.root / "agent-workspace/workers/alice/research/001-storage"
         (self.req / "01-results").mkdir(parents=True)
         (self.req / "spec.md").write_text("# Storage\n类型：research | 编号：001 | 负责人：Alice\n")
 
@@ -140,7 +150,7 @@ class Knowledge(Sandbox):
         output = self.search("STORAGE", "latency").stdout
         self.assertIn("01-results/findings.md", output)
         self.assertIn("负责人：Alice", output)
-        self.assertNotIn("- agent-workspace/alice/research/001-storage/spec.md", output)
+        self.assertNotIn("- agent-workspace/workers/alice/research/001-storage/spec.md", output)
 
     def test_keywords_are_literal_and_all_required(self):
         (self.req / "plan.md").write_text("literal a.*b [x] --flag\n")
@@ -151,7 +161,7 @@ class Knowledge(Sandbox):
     def test_notes_constraints_and_git_history(self):
         self.commit_file(self.root, "src.txt", "payload", "[update] uniquehistory benchmark")
         self.assertIn("Git 提交", self.search("UNIQUEHISTORY", "benchmark").stdout)
-        for relative in ("alice/notes/git-commit-change/2026-01-01/00-00-00-test.md", "alice/specs/constraints.md"):
+        for relative in ("workers/alice/notes/git-commit-change/2026-01-01/00-00-00-test.md", "workers/alice/specs/constraints.md"):
             path = self.root / "agent-workspace" / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_text("unique content phrase")

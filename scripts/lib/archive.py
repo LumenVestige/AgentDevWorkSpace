@@ -53,7 +53,7 @@ def archive_workspace(project):
     options = settings['config']['archive']
     moved = skipped = 0
     for kind in KINDS:
-        base = ws / settings['personal'] / kind
+        base = ws / 'workers' / settings['personal'] / kind
         if not safe_path(base, project):
             print(f'跳过（工作目录为符号链接）：{base}')
             continue

@@ -10,7 +10,7 @@ class ArchiveCommand(Sandbox):
     def setUp(self):
         super().setUp()
         self.root = self.make_project()
-        self.personal = self.root / 'agent-workspace/test-owner'
+        self.personal = self.root / 'agent-workspace/workers/test-owner'
         self.config = self.root / 'agent-workspace/config/config.json5'
 
     def configure(self, **archive):
@@ -77,7 +77,7 @@ class ArchiveCommand(Sandbox):
         target = base / 'archived/01/001-topic'
         target.parent.mkdir(parents=True)
         target.write_text('existing')
-        other = self.root / 'agent-workspace/other/feature'
+        other = self.root / 'agent-workspace/workers/other/feature'
         other.mkdir(parents=True)
         (other / '001-private').write_text('private')
         outside = self.base / 'outside'
@@ -182,3 +182,13 @@ class ArchiveCommand(Sandbox):
         before = snapshot(self.base)
         self.archive()
         self.assertEqual(snapshot(self.base), before)
+
+    def test_archive_does_not_implicitly_migrate_legacy_workers(self):
+        self.configure(threshold=1)
+        self.entries(count=3)
+        legacy = self.root / 'agent-workspace/test-owner/feature'
+        legacy.mkdir(parents=True)
+        (legacy / '001-old').write_text('legacy')
+        self.archive()
+        self.assertEqual((legacy / '001-old').read_text(), 'legacy')
+        self.assertFalse((legacy / 'archived').exists())

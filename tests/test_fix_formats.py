@@ -7,7 +7,7 @@ class LegacyFormats(Sandbox):
     def setUp(self):
         super().setUp()
         self.root = self.make_project()
-        self.notes = self.root / 'agent-workspace/test-owner/notes'
+        self.notes = self.root / 'agent-workspace/workers/test-owner/notes'
         self.notes.mkdir(parents=True)
 
     def write(self, name, text):
@@ -79,3 +79,15 @@ class LegacyFormats(Sandbox):
         self.assertEqual((target / 'summary.md').read_bytes(), text)
         self.assertEqual((target / 'evidence/raw.bin').read_bytes(), b'payload')
         self.assertTrue((self.notes / '26-11-15-../summary.md').exists())
+
+    def test_check_readonly_detection_matches_new_note_formats_and_wrong_types(self):
+        self.write('26-11-15-no-time/summary.md', b'# Outcome')
+        self.write('git-commit-change/2026-11-15/10-00-00-wrong.md', b'# Outcome')
+        before = snapshot(self.root)
+        result = self.run_command([sys.executable, ROOT / 'scripts/command/app.py', 'check', self.root], success=False)
+        self.assertIn('26-11-15-no-time', result.stdout)
+        self.assertIn('10-00-00-wrong.md', result.stdout)
+        self.assertEqual(snapshot(self.root), before)
+        self.fix()
+        result = self.run_command([sys.executable, ROOT / 'scripts/command/app.py', 'check', self.root], success=False)
+        self.assertNotIn('历史 Note 待迁移', result.stdout)

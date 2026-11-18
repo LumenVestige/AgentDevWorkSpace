@@ -8,7 +8,7 @@ sys.dont_write_bytecode = True
 HERE = Path(__file__).resolve().parent
 WS = HERE.parents[2]
 sys.path.insert(0, str(WS / 'skills/common'))
-from _workspace_config import personal_name
+from _workspace_config import personal_dir
 
 
 def local_file(path):
@@ -17,17 +17,17 @@ def local_file(path):
 
 def context():
     root = WS.parent
-    user = personal_name(root)
+    selected = personal_dir(root)
     common = WS / 'skills/custom/sdd/constraints.md'
     if not local_file(common):
         common = WS / 'skills/common/sdd/constraints.md'
     if not local_file(common):
         raise ValueError('通用约束不存在或路径包含符号链接')
-    personal = WS / user / 'specs'
+    personal = selected / 'specs'
     files = [common]
     # specs 是约束目录，支持多个 Markdown；不沿链接加载其他目录中的私有信息。
     personal_files = []
-    if all(not p.is_symlink() for p in (personal, personal.parent)) and personal.is_dir():
+    if all(not p.is_symlink() for p in (personal, personal.parent, personal.parent.parent)) and personal.is_dir():
         personal_files = sorted(p for p in personal.rglob('*.md') if local_file(p))
     files.extend(personal_files)
     parts = ['以下为当前工作区的开发约束。实施任务前逐条遵循，spec/plan 必须检查；个人约束补充通用约束，冲突时以通用约束为准。'
@@ -35,7 +35,7 @@ def context():
     for file in files:
         parts.append(f'## {file.relative_to(root)}\n\n{file.read_text(encoding="utf-8-sig")}')
     if not personal_files:
-        parts.append(f'未找到个人约束：agent-workspace/{user}/specs/*.md；不要借用其他人的约束。')
+        parts.append(f'未找到个人约束：{personal.relative_to(root)}/*.md；不要借用其他人的约束。')
     return '\n\n'.join(parts)
 
 
