@@ -12,7 +12,7 @@ class Notes(Sandbox):
         super().setUp()
         self.root = self.make_project()
         self.config = self.root / "agent-workspace/config/config.json5"
-        self.notes = self.root / "agent-workspace/test-owner/notes"
+        self.notes = self.root / "agent-workspace/workers/test-owner/notes"
         self.state = self.root / "agent-workspace/.agent/env"
 
     def configure(self, **settings):
@@ -43,15 +43,22 @@ class Notes(Sandbox):
 
     def test_commit_recorded_by_another_person_is_recognized(self):
         commit = self.commit_file(self.root, "main.txt", "NEW")
-        path = self.root / "agent-workspace/another/notes/git-commit-change/2026-01-01/00-00-00-record.md"
+        path = self.root / "agent-workspace/workers/another/notes/git-commit-change/2026-01-01/00-00-00-record.md"
         path.parent.mkdir(parents=True)
         path.write_text("# Record\n\n" + commit[:9])
+        self.verify()
+
+    def test_unmigrated_legacy_notes_still_record_commits(self):
+        commit = self.commit_file(self.root, 'legacy-source.txt', 'NEW')
+        legacy = self.root / 'agent-workspace/legacy-owner/notes/record.md'
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(commit[:9])
         self.verify()
 
     def test_note_only_commit_does_not_request_another_note(self):
         commit = self.commit_file(self.root, "main.txt", "BASE")
         (self.state / "note-base").write_text(commit)
-        self.commit_file(self.root, "agent-workspace/test-owner/notes/git-commit-change/2026-01-01/00-00-00-note.md", "# Record")
+        self.commit_file(self.root, "agent-workspace/workers/test-owner/notes/git-commit-change/2026-01-01/00-00-00-note.md", "# Record")
         self.verify()
 
     def test_scan_path_filters_apply_to_commits(self):
@@ -124,7 +131,7 @@ class Notes(Sandbox):
         self.configure(max_notes=2, scan={"commits":False,"large_change":{"enabled":False}})
         day = self.notes / "git-commit-change/2026-01-01"
         day.mkdir(parents=True)
-        other = self.root / "agent-workspace/other/notes/git-commit-change/2026-01-01"
+        other = self.root / "agent-workspace/workers/other/notes/git-commit-change/2026-01-01"
         other.mkdir(parents=True)
         for i in range(4):
             text = f"# Title {i}\n\n## Body\n\nHash deadbeef{i}\n```sh\n# shell comment\n```\n"

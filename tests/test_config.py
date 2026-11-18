@@ -47,7 +47,7 @@ class Configuration(Sandbox):
                 self.assertEqual(config.personal_name(self.root, data), expected)
 
     def test_unsafe_or_reserved_names_rejected(self):
-        for name in ("..", ".", "../escape", "a/b", "a\\b", "a\x00b", "skills", "Skills", "config", ".agent", "!!!"):
+        for name in ("..", ".", "../escape", "a/b", "a\\b", "a\x00b", "skills", "Skills", "workers", "Workers", "config", ".agent", "!!!"):
             with self.subTest(name=name), self.assertRaises(ValueError):
                 config.personal_name(self.root, {"personal":name})
 

@@ -9,13 +9,13 @@ description: 写 Note（改动记录）。完成改变行为、架构、接口�
 
 ## 路径
 
-`agent-workspace/<个人目录>/notes/<类型>/<YYYY-MM-DD>/HH-mm-ss-<topic>.md`，按类型分目录、按天归档，随项目提交。
+`agent-workspace/workers/<个人目录>/notes/<类型>/<YYYY-MM-DD>/HH-mm-ss-<topic>.md`，按类型分目录、按天归档，随项目提交。
 
 - 类型：`git-commit-change`（有未记录到 Note 的提交时写）、`large-scale-file-change`（工作区有大规模未提交的改动时写）；
 - 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不迁移已有目录；
 - 日期目录和文件名中的时间取创建时刻，文件名不再包含年月日；topic 用小写字母、数字加 `-`；
-- 例如 `agent-workspace/tony/notes/git-commit-change/2026-08-25/14-30-05-local-cli-status-restart.md`；
-- 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由用户显式运行 `agentdev fix [目录]`（或 `adev fix`、`agentdev --f`）移到 `git-commit-change/<YYYY-MM-DD>/`；setup / init / update 不再自动迁移。只处理当前配置用户，目标已存在时跳过并保留源文件，可重复执行。
+- 例如 `agent-workspace/workers/tony/notes/git-commit-change/2026-08-25/14-30-05-local-cli-status-restart.md`；
+- 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由用户显式运行 `agentdev fix [目录]`（或 `adev fix`、`agentdev --f`）移到 `git-commit-change/<YYYY-MM-DD>/`；setup / init / update 不再自动迁移。同时迁移所有可识别的旧个人目录到 workers/<个人目录>/，并处理所有用户的旧 Note；目标已存在时保留冲突内容并报告，可重复执行。
 
 ## 创建
 

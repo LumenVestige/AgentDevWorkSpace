@@ -202,6 +202,24 @@ class Entrypoints(unittest.TestCase):
         self.assertIn('new_research', data['hookSpecificOutput']['additionalContext'])
         self.assertEqual(self.calls.read_text(), '1')
 
+    def test_hook_runs_check_and_shows_migration_advice_without_fixing(self):
+        command = self.root / 'scripts/command/app.py'
+        command.parent.mkdir(parents=True)
+        command.write_text('import sys\n'
+                           f'assert sys.argv[1:] == ["check", {str(self.root)!r}]\n'
+                           'print("历史 personal / Note 待迁移，请执行 agentdev fix 进行迁移")\n'
+                           'sys.exit(1)\n')
+        data = self.hook()
+        self.assertIn('agentdev fix', data['systemMessage'])
+        self.assertIn('┌', data['systemMessage'])
+        self.assertIn('new_research', data['hookSpecificOutput']['additionalContext'])
+
+    def test_hook_displays_successful_environment_check(self):
+        command = self.root / 'scripts/command/app.py'
+        command.parent.mkdir(parents=True)
+        command.write_text('print("✓ 环境检查通过，无需迁移")\n')
+        self.assertIn('环境检查通过，无需迁移', self.hook()['systemMessage'])
+
     def test_custom_updater(self):
         custom = self.ws / 'skills/custom/notes'
         custom.mkdir(parents=True)

@@ -1,7 +1,7 @@
 #!/bin/sh
 # 用法（在项目根目录执行）：sh agent-workspace/skills/common/sdd/new.sh <feature|bugfix|change|research> <名称>
 # 通常通过 new_feature.sh / new_bugfix.sh / new_change.sh / new_research.sh 调用。
-# 在当前用户的个人目录下新建 agent-workspace/<个人目录>/<类型>/NNN-<slug>/（类型为 feature、bugfix、change、research），
+# 在当前用户的个人目录下新建 agent-workspace/workers/<个人目录>/<类型>/NNN-<slug>/（类型为 feature、bugfix、change、research），
 # 复制该类型的 spec.md、plan.md、tasks.md 模板，填入名称、编号、负责人，最后输出目录的路径。
 # - 个人目录名取 config.json5 的 personal/peronsal；默认 Git 根目录取 git user.name，非 Git 取电脑用户名，统一规范化；
 # - slug 由名称按同样规则生成，例如 "Login Page" → login-page，中文原样保留；
@@ -50,15 +50,15 @@ user_name=$("$py" "$helper" "$root" --owner)
 
 if [ -d "$ws/skills/custom/sdd/templates" ]; then sdd=custom; else sdd=common; fi
 templates="$ws/skills/$sdd/sdd/templates/$type"
-if [ ! -f "$ws/$user_dir/specs/constraints.md" ]; then
-  mkdir -p "$ws/$user_dir/specs"
-  cp "$ws/skills/$sdd/sdd/personal-constraints.md" "$ws/$user_dir/specs/constraints.md"
+if [ ! -f "$ws/workers/$user_dir/specs/constraints.md" ]; then
+  mkdir -p "$ws/workers/$user_dir/specs"
+  cp "$ws/skills/$sdd/sdd/personal-constraints.md" "$ws/workers/$user_dir/specs/constraints.md"
 fi
-type_dir="$ws/$user_dir/$type"
+type_dir="$ws/workers/$user_dir/$type"
 mkdir -p "$type_dir"
 
 # 同类型同名已存在时报错，不重复创建。
-for d in "$type_dir"/[0-9][0-9][0-9]-"$feature"; do
+for d in "$type_dir"/[0-9][0-9][0-9]-"$feature" "$ws/$user_dir/$type"/[0-9][0-9][0-9]-"$feature"; do
   if [ -d "$d" ]; then
     echo "已存在：${d#"$root"/}" >&2
     exit 1
@@ -67,7 +67,7 @@ done
 
 # 已有的最大编号加一。
 last=0
-for d in "$type_dir"/[0-9][0-9][0-9]-*; do
+for d in "$type_dir"/[0-9][0-9][0-9]-* "$ws/$user_dir/$type"/[0-9][0-9][0-9]-*; do
   [ -d "$d" ] || continue
   n=$(basename "$d" | cut -c1-3)
   n=$(expr "$n" + 0)

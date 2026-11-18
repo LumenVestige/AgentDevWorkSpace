@@ -13,7 +13,7 @@ description: 开发知识库检索。用户要搜索或回顾历史开发痕迹�
 ```
 agent-workspace/
 ├── skills/common/sdd/constraints.md   通用开发约束（项目定制时在 skills/custom/sdd/ 中），编号 C1、C2…
-└── <个人目录>/                         每人一个，目录名遵循 config.json5 的 personal/peronsal 与默认用户名规则
+└── workers/<个人目录>/                         每人一个，目录名遵循 config.json5 的 personal/peronsal 与默认用户名规则
     ├── specs/constraints.md            个人约束，编号 P1、P2…
     ├── feature/NNN-<slug>/             新功能
     ├── bugfix/NNN-<slug>/              bug 修复
@@ -54,19 +54,19 @@ sh agent-workspace/skills/common/knowledge/search.sh <关键词> [关键词…]
 
 ```sh
 # 所有需求的头部（类型、编号、负责人、状态）
-grep -H '^类型：' agent-workspace/*/*/[0-9]*/spec.md
+grep -H '^类型：' agent-workspace/workers/*/*/[0-9]*/spec.md
 # 某人做过的需求
-ls agent-workspace/<个人目录>/feature agent-workspace/<个人目录>/bugfix agent-workspace/<个人目录>/change agent-workspace/<个人目录>/research
+ls agent-workspace/workers/<个人目录>/feature agent-workspace/workers/<个人目录>/bugfix agent-workspace/workers/<个人目录>/change agent-workspace/workers/<个人目录>/research
 # 还没完成的需求 / 未勾选的任务
-grep -L '状态：已完成' agent-workspace/*/*/[0-9]*/spec.md
-grep -n '^- \[ \]' agent-workspace/*/*/[0-9]*/tasks.md
+grep -L '状态：已完成' agent-workspace/workers/*/*/[0-9]*/spec.md
+grep -n '^- \[ \]' agent-workspace/workers/*/*/[0-9]*/tasks.md
 # 最近的 Note
-ls -d agent-workspace/*/notes/*/*/ | sort -t/ -k5 -r | head
+ls -d agent-workspace/workers/*/notes/*/*/ | sort -t/ -k5 -r | head
 ```
 
 ### 3. 追溯：提交、Note、需求、代码
 
-- 提交 → Note：`grep -rl <提交 hash 前 7 位> agent-workspace/*/notes/`
+- 提交 → Note：`grep -rl <提交 hash 前 7 位> agent-workspace/workers/*/notes/`
 - Note → 代码改动：取 `## Git 提交` 中的 hash，`git show --stat <hash>`、`git show <hash>`
 - 代码文件 → 历史：`git log --oneline --follow -- <文件>`，再用 hash 找 Note
 - 某段代码何时引入：`git log -S '<代码片段>' --oneline`；逐行来源：`git blame <文件>`

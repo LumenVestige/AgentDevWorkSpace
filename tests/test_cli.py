@@ -108,7 +108,7 @@ class GlobalCLI(unittest.TestCase):
         custom.mkdir()
         shutil.copy(self.home / 'app/skills/sdd/personal-constraints.md', custom / 'personal-constraints.md')
         (custom / 'welcome.md').write_text('CUSTOM')
-        constraint = root / 'agent-workspace/fixture-user/specs/constraints.md'
+        constraint = root / 'agent-workspace/workers/fixture-user/specs/constraints.md'
         constraint.write_text('PERSONAL')
         self.invoke('init', cwd=root)
         self.assertIn('Keep this.', (root / 'AGENTS.md').read_text())
@@ -327,7 +327,7 @@ class GlobalCLI(unittest.TestCase):
         root = self.project('system user', git_repo=False)
         self.invoke('--i', cwd=root)
         expected = naming.slug(getpass.getuser())
-        self.assertTrue((root / 'agent-workspace' / expected / 'specs/constraints.md').is_file())
+        self.assertTrue((root / 'agent-workspace/workers' / expected / 'specs/constraints.md').is_file())
         self.assertTrue((root / '.gitignore').is_file())
         self.assertIn('/agent-workspace/config/', (root / '.gitignore').read_text())
         self.assertFalse((root / '.git').exists())
@@ -341,13 +341,13 @@ class GlobalCLI(unittest.TestCase):
         self.invoke('init', cwd=root)
         self.assertEqual((config_dir / 'config.json5').read_text(), legacy_text)
         self.assertFalse((config_dir / 'notes.json5').exists())
-        old = root / 'agent-workspace/old-name'
+        old = root / 'agent-workspace/workers/old-name'
         (old / 'notes/keep.md').write_text('USER DATA')
         before = snapshot(old)
         (config_dir / 'config.json5').write_text('{personal:"New Name", auto_update:false}')
         self.invoke('init', cwd=root)
         self.assertEqual(before, snapshot(old))
-        self.assertTrue((root / 'agent-workspace/new-name/specs/constraints.md').exists())
+        self.assertTrue((root / 'agent-workspace/workers/new-name/specs/constraints.md').exists())
         common = root / 'agent-workspace/skills/common'
         result = subprocess.run(['sh', str(common / 'sdd/new_change.sh'), 'Configured Owner'], cwd=root, env=self.env, capture_output=True, text=True, check=True)
         self.assertIn('new-name/change/001-configured-owner', result.stdout)
@@ -364,13 +364,13 @@ class GlobalCLI(unittest.TestCase):
         (config_dir / 'config.json5').write_text('{peronsal:"Alias Name",auto_update:false}')
         (config_dir / 'notes.json5').write_text('{personal:"Legacy Ignored"}')
         self.invoke('init', cwd=root)
-        self.assertTrue((root / 'agent-workspace/alias-name').is_dir())
-        self.assertFalse((root / 'agent-workspace/legacy-ignored').exists())
+        self.assertTrue((root / 'agent-workspace/workers/alias-name').is_dir())
+        self.assertFalse((root / 'agent-workspace/workers/legacy-ignored').exists())
         self.assertEqual((config_dir / 'notes.json5').read_text(), '{personal:"Legacy Ignored"}')
         (config_dir / 'config.json5').write_text('{personal:"Canonical",peronsal:"Alias Name"}')
         self.invoke('init', cwd=root)
-        self.assertTrue((root / 'agent-workspace/canonical').is_dir())
-        self.assertTrue((root / 'agent-workspace/alias-name').is_dir())
+        self.assertTrue((root / 'agent-workspace/workers/canonical').is_dir())
+        self.assertTrue((root / 'agent-workspace/workers/alias-name').is_dir())
 
     def test_invalid_personal(self):
         root = self.project('invalid personal')
@@ -434,7 +434,7 @@ class GlobalCLI(unittest.TestCase):
         (root / 'agent-workspace/config/config.json5').write_text('{auto_update:false}')
         result = subprocess.run([str(self.py), '-B', str(custom_notes / 'create.py'), 'shared-default-name'], cwd=root, env=self.env, capture_output=True, text=True, check=True)
         self.assertIn('/fixture-user/notes/', result.stdout)
-        self.assertFalse((root / 'agent-workspace/must-not-override').exists())
+        self.assertFalse((root / 'agent-workspace/workers/must-not-override').exists())
 
     def test_retired_url_is_migrated_without_losing_comments(self):
         root = self.project('old remote config')
@@ -451,7 +451,7 @@ class GlobalCLI(unittest.TestCase):
         with patch.dict(os.environ, self.env):
             cfg = naming.load_config(root)
         self.assertEqual(cfg['update_url'], semver.DEFAULT_URL)
-        self.assertTrue((root / 'agent-workspace/keep-name').is_dir())
+        self.assertTrue((root / 'agent-workspace/workers/keep-name').is_dir())
 
     def test_installer_removes_legacy_launchers(self):
         for relative in ('bin/agentdev.cmd','bin/agentdev.ps1','env.cmd','env.ps1'):

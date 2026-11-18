@@ -23,7 +23,7 @@ description: Spec-Driven Development 流程。用户输入「创建feature:<名�
 - 目录和模板由脚本创建，不要手工复制模板；同类型同名已存在时脚本报错，此时告诉用户已有的目录，不要另建；
 - 创建后告诉用户目录的路径，然后从下面流程的第 0 步开始。
 
-每次新对话开始或 `/clear` 时，SessionStart hook 输出这些快捷命令（`welcome.md`），显示时机取决于客户端。
+每次新对话开始或 `/clear` 时，SessionStart hook 输出这些快捷命令（`welcome.md`），显示时机取决于客户端；欢迎语同时运行只读 `agentdev check`，检测环境和历史 personal/Note，需迁移时提示 `agentdev fix`。
 Codex、Claude 仅通过官方 hook 回调或外置插件接入，欢迎语显示时机由客户端决定；
 不得通过修改宿主启动脚本、shell 启动配置或同名命令转发来提前展示，也不要让 Agent 在首次回复复述欢迎语。
 
@@ -38,7 +38,7 @@ Codex、Claude 仅通过官方 hook 回调或外置插件接入，欢迎语显�
 - `common/` 每次执行 setup 都会被模板包覆盖，项目要定制约束（或模板、欢迎语）时，先把整个 `common/sdd/` 复制到 `custom/sdd/` 再修改，之后加载和执行的都是 custom 中的版本；
 - 修改约束会改变全项目的约定，须经用户（团队）确认，不在实现某个需求时顺手修改。
 
-个人约束：`agent-workspace/<个人目录>/specs/constraints.md`，个人的自定义约束，只对本人个人目录下的 feature / bugfix / change / research 生效。
+个人约束：`agent-workspace/workers/<个人目录>/specs/constraints.md`，个人的自定义约束，只对本人个人目录下的 feature / bugfix / change / research 生效。
 
 - 由 `init.sh` 从本 skill 的 `personal-constraints.md` 复制，已有时不覆盖；初始内容是示例，按个人习惯修改；
 - 编号用 P1、P2…，与通用约束的 C 编号区分；
@@ -47,7 +47,7 @@ Codex、Claude 仅通过官方 hook 回调或外置插件接入，欢迎语显�
 ## 目录
 
 ```
-agent-workspace/<个人目录>/
+agent-workspace/workers/<个人目录>/
 ├── specs/constraints.md     个人约束
 ├── feature/NNN-<slug>/      新功能
 ├── bugfix/NNN-<slug>/       bug 修复
@@ -56,7 +56,7 @@ agent-workspace/<个人目录>/
 └── notes/                   Note（见 notes skill）
 ```
 
-- 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不迁移已有目录；
+- 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不重命名已有目录；旧版顶层个人目录通过 `agentdev fix` 迁移到 `workers/`；
 - `NNN` 是该类型文件夹内三位递增编号，每种类型单独编号，从 `001` 开始；
 - slug 由名称生成，规则同个人目录名，中文保留，例如 `创建feature:Login Page` → `feature/001-login-page/`，`创建bugfix:登录 超时` → `bugfix/001-登录-超时/`；
 - 模板在本 skill 的 `templates/<类型>/` 下。

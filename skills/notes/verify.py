@@ -4,7 +4,7 @@
 用法（在项目根目录执行）：agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/verify.py
 作为 Claude Code / Codex 的 Stop hook 时从 stdin 读取事件 JSON；需要写 Note 时以退出码 2 把提示交回 Agent。
 
-Note 位于 agent-workspace/<个人目录>/notes/<类型>/<YYYY-MM-DD>/HH-mm-ss-<topic>.md，类型为 git-commit-change 或 large-scale-file-change。
+Note 位于 agent-workspace/workers/<个人目录>/notes/<类型>/<YYYY-MM-DD>/HH-mm-ss-<topic>.md，类型为 git-commit-change 或 large-scale-file-change。
 
 配置：agent-workspace/config/config.json5（JSON5，字段含义见其中的注释；缺少的键取本 skill 中 config.json5 的默认值）
 - enabled：false 时不触发 Note、不合并。

@@ -70,10 +70,14 @@ def personal_name(root, cfg=None):
     if selected.strip().lower() in {".", "..", ".agent"} or any(char in selected for char in ("/", "\\", "\x00")):
         raise ValueError("personal 必须是单个安全目录名，不能包含路径")
     name = slug(selected)
-    reserved = {"skills", "config", ".agent"}
+    reserved = {"skills", "config", ".agent", "workers"}
     if not name or name in reserved:
         raise ValueError("personal 目录名不能为空或使用工作区保留名称")
     return name
+
+
+def personal_dir(root, cfg=None):
+    return root / "agent-workspace" / "workers" / personal_name(root, cfg)
 
 
 def migrate_version_source(root):

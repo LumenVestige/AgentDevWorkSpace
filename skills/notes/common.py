@@ -15,7 +15,7 @@ HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE.parent))
 if not (HERE.parent / "_workspace_config.py").is_file():
     sys.path.insert(0, str(HERE.parent.parent / "common"))
-from _workspace_config import load_config as workspace_config, personal_name
+from _workspace_config import load_config as workspace_config, personal_name, personal_dir
 ROOT = HERE.parents[3]  # 项目根目录（本文件位于 agent-workspace/skills/common/notes/）
 ENV = ROOT / "agent-workspace" / ".agent" / "env"
 
@@ -75,11 +75,8 @@ DATE_DIR = re.compile(r"\d{4}-\d{2}-\d{2}")
 
 
 def notes_dir(root):
-    """当前用户的 Note 目录：agent-workspace/<个人目录>/notes。"""
-    name = user_dir_name(root)
-    if not name:
-        sys.exit("找不到个人目录，请检查 config.json5 中的 personal 配置")
-    return root / "agent-workspace" / name / "notes"
+    """当前用户的 Note 目录：agent-workspace/workers/<个人目录>/notes。"""
+    return personal_dir(root) / "notes"
 
 
 def day_dir(notes, note_type, day=None):
@@ -95,7 +92,16 @@ def day_dirs(notes):
 
 def all_notes(root):
     """所有人的 Note（含 notes/ 下旧的平铺 Note），用于判断提交是否已记录：别人的提交记在别人的个人目录中。"""
-    return (root / "agent-workspace").glob("*/notes/**/*.md")
+    ws = root / "agent-workspace"
+    for base in (ws / "workers", ws):
+        if not base.is_dir() or base.is_symlink():
+            continue
+        for personal in base.iterdir():
+            if personal.is_symlink() or personal.name in {"workers", "skills", "config", ".agent"}:
+                continue
+            notes = personal / "notes"
+            if not notes.is_symlink():
+                yield from (p for p in notes.rglob("*.md") if not p.is_symlink())
 
 
 def base_file(root):
@@ -158,7 +164,7 @@ def pathspec(scan):
 
     Note 随项目提交：各人 notes/ 不计入，否则提交 Note 本身又会触发新的 Note。
     """
-    excludes = [*scan.get("exclude_paths", []), "agent-workspace/*/notes/*"]
+    excludes = [*scan.get("exclude_paths", []), "agent-workspace/workers/*/notes/*", "agent-workspace/*/notes/*"]
     return ["--", *scan.get("paths", []), *(f":(exclude){p}" for p in excludes)]
 
 
