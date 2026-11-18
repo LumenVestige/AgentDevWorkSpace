@@ -30,7 +30,8 @@ fish 中先运行 `sh AgentDevWorkSpace/setup.sh`，再执行安装器输出的 
 | `agentdev init [目录]` | `agentdev --i [目录]` | 调用 deps.sh 安装共享依赖，再初始化工作区并检查环境；失败返回非零 |
 | `agentdev update` | `agentdev --u` | 检查版本，强制覆盖安装目录改动并刷新当前工作区 |
 | `agentdev version` | `agentdev --v` | 展示本地与远端版本；查询失败时明确报错 |
-| `agentdev fix [目录]` | `agentdev --f [目录]` | 显式修复旧版 notes 目录，不覆盖已有文件 |
+| `agentdev fix [目录]` | `agentdev --f [目录]` | 显式修复旧版 notes 目录及误分类，不覆盖已有文件 |
+| `agentdev archive [目录]` | `agentdev --a [目录]` | 将较早的开发记录分组移入小写 archived 目录 |
 | `agentdev check [目录]` | `agentdev --c [目录]` | 只读检查安装目录改动、工作区和环境，不修复文件 |
 
 上表命令的旧单横线形式作为兼容别名保留。安装不属于 app 命令：`setup`、`-setup`、`--s` 已移除，请直接运行或 source 根目录的 `setup.sh`；帮助和示例使用上表规范。
@@ -131,13 +132,37 @@ agentdev fix            # 修复当前工作区（adev fix 等价）
 agentdev fix /path/to/project  # 修复指定工作区；也可用 --f / -fix
 ```
 
-`fix` 独立于 `setup`、`init` 和 `update`，目前只迁移当前配置用户的旧版平铺 Note：
-`agent-workspace/<个人目录>/notes/yy-MM-dd-HH-mm-ss-<topic>.md` →
-`notes/git-commit-change/YYYY-MM-DD/HH-mm-ss-<topic>.md`，文件内容不变。
-仅处理当前 `personal`（兼容 `peronsal`，未配置时使用默认用户名），不移动其他用户目录或不匹配命名的文件。
-目标存在时跳过并保留源文件，输出迁移数和冲突跳过数，可重复运行；无旧 Note 时成功且不写文件。
-目录不存在、没有 `agent-workspace/` 或配置错误时返回非零，不自动初始化、安装或更新。
+`fix` 独立于 `setup`、`init` 和 `update`，只处理当前配置用户的 Note：
+
+- 识别 `yy-MM-dd-<topic>.md`、`yy-MM-dd-HH-mm-ss-<topic>.md` 和日期前缀主题目录，也支持四位年份；日期必须有效。
+- 按正文的 `## Git 提交`（兼容 `Commits` / `提交记录`）中实际的提交 hash 行分类：有提交记录进入 `git-commit-change`，没有则进入 `large-scale-file-change`；模板占位、诊断 SHA-256 或行内提及旧提交不作为提交记录。
+- 去掉名称中的日期前缀，放进对应类型的 `YYYY-MM-DD/`；保留时分秒和主题名称。目录整体移动，附件和内容不变。
+- 同时纠正旧版 fix 错放在 `git-commit-change/YYYY-MM-DD/` 下的非提交记录；不扫描 archived 分组。
+- 只处理当前 `personal`（兼容 `peronsal`，未配置时使用默认用户名）；其他用户和无日期的无关文件不动。
+- 目标重名时保留源和目标并输出路径；不沿符号链接迁移，可重复执行。
+
 旧 `scripts/lib/fix.py` / `fix.sh` 入口保留兼容；初始化和更新不再隐式执行 Note 迁移，其他配置与安装兼容迁移不受影响。
+
+## 开发记录分组归档
+
+```sh
+agentdev archive                 # adev archive 等价；也可用 --a / -archive
+agentdev archive /path/to/project
+```
+
+仅整理当前用户的 `feature`、`bugfix`、`change`、`research`、`notes/git-commit-change` 和
+`notes/large-scale-file-change` 六个目录，不由 setup/init/update 自动触发。
+每个目录的直接文件/子目录超过 N 时，保留按名称排序最新的 N 项，将较早的超出部分按名称顺序移入
+该目录的小写 `archived/01/`、`archived/02/`…，每组最多 M 项；补满最后一个组后再增加编号。
+Note 以日期目录为一项，不拆散日期或主题目录；隐藏项、符号链接和 `archived` 本身不参与数量统计。
+同名目标不覆盖并提示保留源文件；不存在的目录不创建。归档保留条目内部结构与内容，不重写文档中的跨目录链接。
+SDD 新编号/同名检查、布局检查和知识检索覆盖已归档需求；已归档 Note 仍参与提交记录识别。
+
+在 `agent-workspace/config/config.json5` 中配置（均为正整数，缺失字段使用默认值）：
+
+```json5
+{ archive: { threshold: 50, group_size: 100 } }
+```
 
 ## 个人目录与统一配置
 
@@ -157,6 +182,15 @@ agentdev fix /path/to/project  # 修复指定工作区；也可用 --f / -fix
 - 修改后，后续 init、SDD、Note 和 layout 使用新名称；旧个人目录及其数据不迁移、不合并、不删除。新增需求时会补齐新目录的个人约束模板。
 - init 会把旧 `notes.json5` 更名为 `config.json5`，保留内容和注释；两者并存时新文件优先，旧文件不覆盖或合并。
 - 无论是否是 Git 仓库，init 都会正常创建或补充 `.gitignore`，保留已有条目。
+
+## 个人开发约束
+
+`agent-workspace/<personal>/specs/constraints.md` 及同目录树内其他 Markdown 文件通过独立的
+`SessionStart` hook 加载进 Agent 上下文，按当前配置选择用户，不读取其他用户或符号链接目标。
+通用约束优先使用 `skills/custom/sdd/constraints.md`，没有时使用 common；通用约束优先于个人约束。
+启动、恢复、clear 和 compact 后均加载，不因自定义欢迎语被绕过；配置或文件读取错误明确报告。
+升级源码后需在目标项目执行 `agentdev init` 或更新工作区来同步 skill 和 hook；既有约束内容不会被覆盖。
+每次开发任务仍需读取最新源文件，尤其是会话内修改约束后。hook 提供约束上下文，不对任意自然语言规则作自动语义验证；spec/plan 仍须逐项检查。
 
 ## 宿主接入与欢迎语
 
@@ -194,7 +228,7 @@ agentdev / adev             macOS/Linux 源码命令入口，默认展示帮助
 setup.sh                   安装与 bash/zsh 当前会话激活入口
 update.sh                  独立更新入口
 scripts/command/app.py     CLI 参数解析与命令分发
-scripts/command/           help / init / check / fix / update / version 的实现
+scripts/command/           help / init / check / fix / archive / update / version 的实现
 scripts/command/*.sh       init / check / update 的 shell 入口及 Codex 启动器
 scripts/lib/fix.py, fix.sh  旧版 notes 迁移及兼容入口
 scripts/lib/installer.py   全局安装、运行时、PATH 与安装锁
@@ -210,6 +244,7 @@ skills/git-commit/SKILL.md      git-commit skill：提交信息规则
 skills/git-commit/commit-msg    提交标签校验（commit-msg hook）
 skills/sdd/SKILL.md             sdd skill：SDD 流程、需求目录与编号规则
 skills/sdd/constraints.md       通用开发约束规范
+skills/sdd/load_constraints.py  独立 SessionStart hook，加载当前用户 specs/**/*.md 和 custom 优先的通用约束
 skills/sdd/personal-constraints.md  个人约束模板（复制到 <个人目录>/specs/constraints.md）
 skills/sdd/new.sh               创建 <个人目录>/<feature|bugfix|change|research>/NNN-<slug>/ 并复制该类型的模板
 skills/sdd/new_feature.sh, new_bugfix.sh, new_change.sh, new_research.sh  快捷命令「创建feature/bugfix/change/research:<名称>」对应的入口

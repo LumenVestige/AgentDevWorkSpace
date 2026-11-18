@@ -15,7 +15,8 @@ description: 写 Note（改动记录）。完成改变行为、架构、接口�
 - 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不迁移已有目录；
 - 日期目录和文件名中的时间取创建时刻，文件名不再包含年月日；topic 用小写字母、数字加 `-`；
 - 例如 `agent-workspace/tony/notes/git-commit-change/2026-08-25/14-30-05-local-cli-status-restart.md`；
-- 旧版本平铺在 `notes/` 下的 `yy-MM-dd-HH-mm-ss-<topic>.md` 由用户显式运行 `agentdev fix [目录]`（或 `adev fix`、`agentdev --f`）移到 `git-commit-change/<YYYY-MM-DD>/`；setup / init / update 不再自动迁移。只处理当前配置用户，目标已存在时跳过并保留源文件，可重复执行。
+- 旧版本平铺的日期前缀文件或主题目录（两位/四位年份，可含时分秒）由用户显式运行 `agentdev fix [目录]`（或 `adev fix`、`agentdev --f`）迁移：正文有实际 Git 提交记录时放入 `git-commit-change/<YYYY-MM-DD>/`，否则放入 `large-scale-file-change/<YYYY-MM-DD>/`；目录整体保留。旧 fix 已错分到 Git 日期目录的非提交 Note 也会纠正。setup / init / update 不自动迁移；只处理当前用户，冲突保留源和目标并提示，不沿符号链接迁移，可重复执行。
+- `agentdev archive` 按日期目录（或直接文件）整理两个类型目录，超过 `archive.threshold`（默认 50）时保留最新 N 项，较早项放入该类型目录的 `archived/01/` 等分组，每组最多 `archive.group_size`（默认 100）项；历史提交 hash 和知识检索仍覆盖归档内容，不拆散日期目录。
 
 ## 创建
 
@@ -75,6 +76,7 @@ skill 运行时优先使用 `agent-workspace/.agent/env/python-path` 记录的�
 
 `agent-workspace/config/config.json5`（JSON5，每个字段都有注释；缺少的字段取本 skill 中 `config.json5` 的默认值）：
 
+- `archive`：显式分组归档配置，`threshold` 默认 50、`group_size` 默认 100，均为正整数；缺失字段自动合并默认值。
 - `personal`：个人目录名，留空时 Git 根目录用 git user.name、非 Git 目录用电脑用户名；兼容 `peronsal`，非空 `personal` 优先。修改后不移动旧目录；
 - `enabled`：是否开启 Note 校验；
 - `max_notes`：每个日期目录（`notes/<类型>/<YYYY-MM-DD>/`）的 Note 上限，超过时合并最早的，默认 100；

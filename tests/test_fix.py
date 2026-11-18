@@ -11,7 +11,7 @@ class FixCommandTests(Sandbox):
         return self.run_command([sys.executable, '-B', ROOT / 'scripts/command/app.py', *args],
                                 cwd=cwd, success=success)
 
-    def legacy_note(self, root, name='26-11-17-10-20-30-topic.md', user='test-owner', content=b'# Note\r\n'):
+    def legacy_note(self, root, name='26-11-17-10-20-30-topic.md', user='test-owner', content=b'# Note\r\n## Git \xe6\x8f\x90\xe4\xba\xa4\n```\nabcdef0 [fix] recorded\n```\n'):
         path = root / 'agent-workspace' / user / 'notes' / name
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_bytes(content)
@@ -24,7 +24,7 @@ class FixCommandTests(Sandbox):
         result = self.invoke('fix', cwd=root)
         self.assertIn('已迁移 1 个', result.stdout)
         self.assertFalse(source.exists())
-        self.assertEqual(target.read_bytes(), b'# Note\r\n')
+        self.assertEqual(target.read_bytes(), b'# Note\r\n## Git \xe6\x8f\x90\xe4\xba\xa4\n```\nabcdef0 [fix] recorded\n```\n')
         before = snapshot(root)
         self.assertIn('已迁移 0 个', self.invoke('fix', cwd=root).stdout)
         self.assertEqual(snapshot(root), before)
@@ -37,7 +37,7 @@ class FixCommandTests(Sandbox):
                 source = self.legacy_note(root)
                 self.assertIn('已迁移 1 个', self.invoke(alias, root).stdout)
                 target = source.parent / 'git-commit-change/2026-11-17/10-20-30-topic.md'
-                self.assertEqual(target.read_bytes(), b'# Note\r\n')
+                self.assertEqual(target.read_bytes(), b'# Note\r\n## Git \xe6\x8f\x90\xe4\xba\xa4\n```\nabcdef0 [fix] recorded\n```\n')
                 target.unlink()
         source = self.legacy_note(root)
         result = self.run_command([ROOT / 'adev', 'fix', root])
@@ -49,11 +49,11 @@ class FixCommandTests(Sandbox):
         source = self.legacy_note(root)
         target = source.parent / 'git-commit-change/2026-11-17/10-20-30-topic.md'
         target.parent.mkdir(parents=True)
-        target.write_bytes(b'existing target')
+        target.write_bytes(b'## Git \xe6\x8f\x90\xe4\xba\xa4\nabcdef0 [fix] existing target\n')
         self.legacy_note(root, name='README.md')
         self.legacy_note(root, user='other-user')
-        self.legacy_note(root, name='2026-11-17-10-20-30-new-format.md')
-        (source.parent / '26-11-17-10-20-30-directory.md').mkdir()
+        self.legacy_note(root, name='undated-new-format.md')
+        (source.parent / 'undated-directory').mkdir()
         before = snapshot(root)
         result = self.invoke('fix', root)
         self.assertIn('目标已存在跳过 1 个', result.stdout)

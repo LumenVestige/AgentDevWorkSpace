@@ -8,14 +8,14 @@ import sys
 
 sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from command import help, init, check, fix, update, version
+from command import help, init, check, fix, archive, update, version
 from lib.installer import require_platform
 
 ALIASES = {
     "-help": "help", "--h": "help", "--help": "help", "-h": "help",
     "-init": "init", "--i": "init", "-update": "update", "--u": "update",
     "-version": "version", "--v": "version", "--version": "version", "-v": "version",
-    "-check": "check", "--c": "check", "-fix": "fix", "--f": "fix",
+    "-check": "check", "--c": "check", "-fix": "fix", "--f": "fix", "-archive": "archive", "--a": "archive",
 }
 
 
@@ -25,11 +25,11 @@ def main(argv=None):
     argv = [ALIASES.get(argv[0], argv[0]), *argv[1:]] if argv else ["help"]
     parser = argparse.ArgumentParser(prog="agentdev", description="AgentDevWorkSpace 工作区管理",
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.epilog = ("别名：help / --h；init / --i；update / --u；version / --v；check / --c；fix / --f。\n"
+    parser.epilog = ("别名：help / --h；init / --i；update / --u；version / --v；check / --c；fix / --f；archive / --a。\n"
                      "adev 与 agentdev 等价；不传命令时展示帮助；工作区目录名为 agent-workspace/。")
     parser.set_defaults(root_parser=parser)
     commands = parser.add_subparsers(dest="command")
-    for module in (help, init, check, fix, update, version):
+    for module in (help, init, check, fix, archive, update, version):
         module.register(commands)
     args = parser.parse_args(argv)
     if args.command in {"init", "update"} and not (args.command == "update" and args.status) and not shutil.which("git"):

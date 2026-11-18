@@ -304,7 +304,9 @@ class SharedUpdateIntegration(Sandbox):
         self.assertIn('下载源码', result.stdout)
         self.assertIn('安装依赖', result.stdout)
         self.assertIn('刷新工作区', result.stdout)
-        self.assertIn('Requirement', Path(value['log_path']).read_text())
+        # setup 不安装 skill 依赖：首次 update 可能执行安装，也可能复用已有包。
+        dependency_log = Path(value['log_path']).read_text()
+        self.assertRegex(dependency_log, r'(?:Successfully installed json5|Requirement already satisfied: json5)')
         self.assertFalse((self.home / 'app/plugins/claude-update').exists())
         self.assertEqual(installation_risk(self.home), ('', False))
         query = self.run_command([sys.executable, self.entry, 'update', '--status'])

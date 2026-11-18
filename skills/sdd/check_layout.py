@@ -81,11 +81,14 @@ def problems(paths, base):
     for path in sorted(paths):
         parts = Path(path).parts
         # agent-workspace/<个人目录>/<类型>/<NNN-slug>/...
-        if len(parts) < 5 or parts[2] not in TYPES or not REQ_DIR.match(parts[3]):
+        if len(parts) < 5 or parts[2] not in TYPES:
             continue
-        if any(p in JUNK for p in parts[4:]):
+        index = 5 if parts[3] == "archived" and len(parts) >= 7 and re.fullmatch(r"[0-9]{2,}", parts[4]) else 3
+        if not REQ_DIR.match(parts[index]):
             continue
-        req, rest = "/".join(parts[:4]), parts[4:]
+        if any(p in JUNK for p in parts[index + 1:]):
+            continue
+        req, rest = "/".join(parts[:index + 1]), parts[index + 1:]
         if len(rest) == 1:
             if rest[0] in ROOT_FILES:
                 continue

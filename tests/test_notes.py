@@ -177,7 +177,7 @@ class Notes(Sandbox):
         old.write_text("LEGACY")
         collision = self.notes / "26-01-02-03-04-06-same.md"
         collision.write_text("OLD MUST REMAIN")
-        target = self.notes / "git-commit-change/2026-01-02/03-04-06-same.md"
+        target = self.notes / "large-scale-file-change/2026-01-02/03-04-06-same.md"
         target.parent.mkdir(parents=True)
         target.write_text("NEW MUST REMAIN")
         with patch.dict(os.environ, self.env, clear=True):

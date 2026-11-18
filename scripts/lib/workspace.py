@@ -16,7 +16,7 @@ REPOSITORY = "https://github.com/LumenVestige/AgentDevWorkSpace.git"
 
 MARK_BEGIN = "<!-- agentskill:begin 以下内容由 AgentDevWorkSpace 的 init.sh 追加，重新执行时会被替换，请勿修改 -->"
 MARK_END = "<!-- agentskill:end -->"
-SCRIPTS = {"Stop": ("notes/verify.py", "sdd/check_layout.py"), "SessionStart": ("sdd/welcome.py",)}
+SCRIPTS = {"Stop": ("notes/verify.py", "sdd/check_layout.py"), "SessionStart": ("sdd/welcome.py", "sdd/load_constraints.py")}
 
 
 def git(root, *args):
@@ -208,7 +208,7 @@ def register_hooks(path, cfg, py, source, project):
             if hooks:
                 kept.append({**entry, "hooks": hooks})
         for script in scripts:
-            kept.append({**({"matcher": "startup|clear"} if event == "SessionStart" else {}),
+            kept.append({**({"matcher": "startup|clear"} if event == "SessionStart" and script == "sdd/welcome.py" else {}),
                          "hooks": [{"type": "command", "command": hook_command(py, source, project, script, "claude" if path.parent.name == ".claude" else "codex")}]})
         events[event] = kept
     write_if_changed(path, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")

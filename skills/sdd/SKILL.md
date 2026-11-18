@@ -43,6 +43,7 @@ Codex、Claude 仅通过官方 hook 回调或外置插件接入，欢迎语显�
 - 由 `init.sh` 从本 skill 的 `personal-constraints.md` 复制，已有时不覆盖；初始内容是示例，按个人习惯修改；
 - 编号用 P1、P2…，与通用约束的 C 编号区分；
 - 与通用约束冲突时以通用约束为准，在 spec 的约束检查中说明。
+- 独立 `load_constraints.py` SessionStart hook 在启动、恢复、clear 和 compact 后将通用约束及当前用户 `specs/**/*.md` 加载到 Agent 上下文；不依赖 welcome.py，读取错误明确报错。每个开发任务前仍须重新读取源文件，避免会话内修改后使用旧约束。
 
 ## 目录
 
@@ -57,8 +58,9 @@ agent-workspace/<个人目录>/
 ```
 
 - 个人目录名优先取配置 `personal`（兼容 `peronsal`）；默认 Git 根目录取 `git config user.name`，非 Git 目录取电脑用户名，转小写并把空格和标点换成 `-`。修改命名不迁移已有目录；
-- `NNN` 是该类型文件夹内三位递增编号，每种类型单独编号，从 `001` 开始；
+- `NNN` 是该类型文件夹内三位递增编号，每种类型单独编号，从 `001` 开始；编号及同名检查包含 `archived/NN/` 中的历史需求，不复用；
 - slug 由名称生成，规则同个人目录名，中文保留，例如 `创建feature:Login Page` → `feature/001-login-page/`，`创建bugfix:登录 超时` → `bugfix/001-登录-超时/`；
+- `agentdev archive` 可将较早的需求整体移入 `archived/01/` 等分组，默认保留最新 50 项、每组最多 100 项；布局检查和知识检索仍覆盖归档内容。
 - 模板在本 skill 的 `templates/<类型>/` 下。
 - research 的调研记录、方案对比、实验验证与结论提交使用 `[research]` 标签（见 git-commit skill）。
 

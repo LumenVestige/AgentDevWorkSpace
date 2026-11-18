@@ -58,16 +58,16 @@ type_dir="$ws/$user_dir/$type"
 mkdir -p "$type_dir"
 
 # 同类型同名已存在时报错，不重复创建。
-for d in "$type_dir"/[0-9][0-9][0-9]-"$feature"; do
+for d in "$type_dir"/[0-9][0-9][0-9]-"$feature" "$type_dir"/archived/[0-9]*/[0-9][0-9][0-9]-"$feature"; do
   if [ -d "$d" ]; then
     echo "已存在：${d#"$root"/}" >&2
     exit 1
   fi
 done
 
-# 已有的最大编号加一。
+# 已有的最大编号加一，包含 archived 分组，避免编号和同名需求复用。
 last=0
-for d in "$type_dir"/[0-9][0-9][0-9]-*; do
+for d in "$type_dir"/[0-9][0-9][0-9]-* "$type_dir"/archived/[0-9]*/[0-9][0-9][0-9]-*; do
   [ -d "$d" ] || continue
   n=$(basename "$d" | cut -c1-3)
   n=$(expr "$n" + 0)

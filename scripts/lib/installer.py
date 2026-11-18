@@ -248,7 +248,7 @@ def install(source, home, no_path=False, repo=None, progress=None, install_depen
         if Path(os.environ.get("SHELL", "")).name == "fish":
             print(f"当前 fish 激活：source {shlex.quote(str(home / 'env.fish'))}")
         else:
-            print(f"当前终端激活：. {shlex.quote(str(home / 'env'))}；也可直接 source setup.sh 安装并激活。")
+            print(f"当前终端激活：. {shlex.quote(str(home / 'env'))}")
 
 
 

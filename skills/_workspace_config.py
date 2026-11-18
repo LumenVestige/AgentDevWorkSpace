@@ -32,7 +32,15 @@ def load_config(root, defaults=None):
         raise ValueError(f"scan / large_change 必须是对象：{path}")
     scan = {**cfg["scan"], **user_scan}
     scan["large_change"] = {**cfg["scan"]["large_change"], **user_scan.get("large_change", {})}
+    archive = user.get("archive", {})
+    if not isinstance(archive, dict):
+        raise ValueError(f"archive 必须是对象：{path}")
+    archive = {**cfg.get("archive", {"threshold": 50, "group_size": 100}), **archive}
+    for key in ("threshold", "group_size"):
+        if type(archive.get(key)) is not int or archive[key] <= 0:
+            raise ValueError(f"archive.{key} 必须是正整数：{path}")
     cfg.update(user)
+    cfg["archive"] = archive
     cfg["scan"] = scan
     if isinstance(cfg.get("update_url"), str):
         cfg["update_url"] = normalize_url(cfg["update_url"])

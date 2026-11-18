@@ -20,7 +20,8 @@ cd "$(dirname "$ws")" || exit 1
 
 # 关键词逐行写入临时文件，供 grep -f 和逐个检查使用，避免引号、空格等字符的转义问题。
 kwfile=$(mktemp) || exit 1
-trap 'rm -f "$kwfile"' EXIT
+listfile=$(mktemp) || { rm -f "$kwfile"; exit 1; }
+trap 'rm -f "$kwfile" "$listfile"' EXIT
 for k in "$@"; do printf '%s\n' "$k" >> "$kwfile"; done
 
 # 文件是否包含全部关键词。
@@ -35,7 +36,9 @@ show() {
   echo "- $1"
   # 需求目录根下的文档，或已归类到 NN-<主题>/ 子目录中的文档（见 sdd skill「需求目录内的文件」）。
   d=$(dirname "$1")
-  [ -f "$d/spec.md" ] || d=$(dirname "$d")
+  while [ "$d" != . ] && [ "$d" != agent-workspace ] && [ ! -f "$d/spec.md" ]; do
+    d=$(dirname "$d")
+  done
   spec=$d/spec.md
   if [ -f "$spec" ]; then
     head=$(grep -m1 '^类型：' "$spec") && echo "    [$head]"
@@ -58,13 +61,33 @@ search() {
   total=$((total + n))
 }
 
+# 递归检索 archived 分组和主题附件，不跟随目录符号链接；read 保留含空格的路径。
+search_tree() {
+  title=$1; shift
+  : > "$listfile"
+  for directory in "$@"; do
+    [ ! -L "$directory" ] && [ -d "$directory" ] || continue
+    find "$directory" -type f -name '*.md' -print >> "$listfile"
+  done
+  n=0
+  while IFS= read -r f; do
+    has_all "$f" || continue
+    [ "$n" -gt 0 ] || echo "== $title =="
+    n=$((n + 1))
+    show "$f"
+  done < "$listfile"
+  [ "$n" -eq 0 ] || echo
+  total=$((total + n))
+}
+
 W=agent-workspace
-search "功能 feature" $W/*/feature/*/*.md $W/*/feature/*/*/*.md
-search "bug 修复 bugfix" $W/*/bugfix/*/*.md $W/*/bugfix/*/*/*.md
-search "变更 change" $W/*/change/*/*.md $W/*/change/*/*/*.md
-search "调研 research" $W/*/research/*/*.md $W/*/research/*/*/*.md
-search "Note" $W/*/notes/*/*/*.md $W/*/notes/*.md
-search "约束" $W/skills/custom/sdd/constraints.md $W/skills/common/sdd/constraints.md $W/*/specs/constraints.md
+search_tree "功能 feature" $W/*/feature
+search_tree "bug 修复 bugfix" $W/*/bugfix
+search_tree "变更 change" $W/*/change
+search_tree "调研 research" $W/*/research
+search_tree "Note" $W/*/notes
+search "约束" $W/skills/custom/sdd/constraints.md $W/skills/common/sdd/constraints.md
+search_tree "个人约束" $W/*/specs
 
 # 提交信息：全部关键词都出现的提交，最多 20 条。
 if git rev-parse --git-dir >/dev/null 2>&1; then

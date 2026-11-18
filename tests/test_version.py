@@ -46,7 +46,7 @@ class RemoteVersionTests(unittest.TestCase):
         self.assertEqual(result, (0, 3, 7))
         self.assertEqual(urls, [version.API_URL, version.RAW_URL])
 
-    def test_welcome_and_background_checks_use_five_seconds_per_endpoint(self):
+    def test_welcome_uses_five_seconds_per_endpoint(self):
         with tempfile.TemporaryDirectory(prefix="agentdev-version-timeout-") as temporary:
             root = Path(temporary)
             skill = root / "installation"
@@ -61,13 +61,13 @@ class RemoteVersionTests(unittest.TestCase):
                 setattr(common, name, mock.Mock())
             with mock.patch.dict(sys.modules, {"common": common}):
                 updater = runpy.run_path(str(Path(__file__).resolve().parents[1] / "skills/notes/update.py"))
-            for entry in ("welcome", "check"):
-                with self.subTest(entry=entry), contextlib.redirect_stdout(io.StringIO()), \
-                        mock.patch.object(version.urllib.request, "urlopen", side_effect=[
-                            TimeoutError("timed out"), io.BytesIO(b"0.3.7\n")]) as open_url:
-                    updater[entry](root, *([cfg] if entry == "check" else []))
-                    self.assertEqual(open_url.call_count, 2)
-                    self.assertEqual([call.kwargs["timeout"] for call in open_url.call_args_list], [5, 5])
+            # 后台 check 已委托独立 update 命令（test_update 覆盖），不再在 hook 中联网。
+            with contextlib.redirect_stdout(io.StringIO()), \
+                    mock.patch.object(version.urllib.request, "urlopen", side_effect=[
+                        TimeoutError("timed out"), io.BytesIO(b"0.3.7\n")]) as open_url:
+                updater["welcome"](root)
+                self.assertEqual(open_url.call_count, 2)
+                self.assertEqual([call.kwargs["timeout"] for call in open_url.call_args_list], [5, 5])
 
     def test_valid_plain_version_stops_without_fallback(self):
         result, urls = self.fetch([b"0.3.7\n"])

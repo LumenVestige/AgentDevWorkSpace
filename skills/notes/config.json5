@@ -4,6 +4,9 @@
   // 个人目录名：空字符串时，Git 根目录取 git user.name，非 Git 目录取电脑用户名。
   // 修改后仅影响后续路径，不迁移已有目录；兼容 peronsal 拼写，personal 非空时优先。
   personal: "",
+  // 显式 agentdev archive：六类开发记录超过 threshold 项后，保留按名称排序最新的 threshold 项。
+  // 较早条目移动到各目录 archived/01、02…，每组最多 group_size 项；两项均为正整数。
+  archive: { threshold: 50, group_size: 100 },
   // Note 开关。false 时 verify.py 不触发 Note，也不按上限合并。
   enabled: true,
   // 每个日期目录（notes/<类型>/<YYYY-MM-DD>/）的 Note 上限。超出时 verify.py 把最早的几条合并为一条，使数量回到上限，内容不删除。

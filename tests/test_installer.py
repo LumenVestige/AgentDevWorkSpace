@@ -1,7 +1,10 @@
 """Installation protections, rollback and shell profile preservation."""
+import contextlib
+import io
 import json
 import os
 from pathlib import Path
+import shlex
 import subprocess
 import sys
 from unittest.mock import Mock, patch
@@ -73,6 +76,20 @@ class Installer(Sandbox):
         self.assertEqual(before, snapshot(self.home / "app"))
         self.assertEqual((self.home / "install.json").read_bytes(), state)
         self.assertFalse((self.home / "app.previous").exists())
+
+    def test_activation_hint_only_shows_current_terminal_command(self):
+        self.managed_install()
+        for shell in ("/bin/bash", "/bin/zsh"):
+            with self.subTest(shell=shell), \
+                    patch.dict(os.environ, {**self.env, "SHELL": shell}, clear=True), \
+                    patch.object(agentdev, "run"), \
+                    patch.object(agentdev.subprocess, "run", return_value=Mock(returncode=0)), \
+                    patch.object(agentdev, "runtime_errors", return_value=[]), \
+                    patch.object(agentdev, "configure_path"), \
+                    contextlib.redirect_stdout(io.StringIO()) as output:
+                agentdev.install(self.source, self.home, repo="fixture", install_dependencies=False)
+                self.assertEqual(output.getvalue().splitlines()[-1],
+                                 f"当前终端激活：. {shlex.quote(str(self.home / 'env'))}")
 
     def test_failed_dependency_install_keeps_existing_app(self):
         self.managed_install()
