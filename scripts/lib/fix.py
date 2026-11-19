@@ -62,16 +62,17 @@ def legacy_notes(ws, user=None):
 
 
 def migration_issues(project, user=None):
-    """不创建目录、不运行迁移；与 fix 使用同样的候选规则。"""
+    """只返回迁移提醒，不逐条列出路径；与 fix 使用同样的候选规则。"""
     ws = project / "agent-workspace"
     if ws.is_symlink():
         return ["agent-workspace 是符号链接，不能安全检查迁移数据"]
-    issues = [f"历史 personal 目录待迁移：{p.relative_to(project)}" for p in legacy_workers(ws, user)]
+    issues = ["历史 personal / Note 待迁移"] if legacy_workers(ws, user) else []
     workers = ws / "workers"
     if workers.is_symlink() or (workers.exists() and not workers.is_dir()):
         issues.append("workers 必须是普通目录，不能安全迁移至符号链接或文件")
         return issues
-    issues += [f"历史 Note 待迁移：{p.relative_to(project)}" for p in legacy_notes(ws, user)]
+    if not issues and next(legacy_notes(ws, user), None) is not None:
+        issues.append("历史 personal / Note 待迁移")
     return issues
 
 

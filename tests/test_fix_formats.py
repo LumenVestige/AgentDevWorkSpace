@@ -85,9 +85,24 @@ class LegacyFormats(Sandbox):
         self.write('git-commit-change/2026-11-15/10-00-00-wrong.md', b'# Outcome')
         before = snapshot(self.root)
         result = self.run_command([sys.executable, ROOT / 'scripts/command/app.py', 'check', self.root], success=False)
-        self.assertIn('26-11-15-no-time', result.stdout)
-        self.assertIn('10-00-00-wrong.md', result.stdout)
+        self.assertEqual(result.stdout.count('历史 personal / Note 待迁移'), 1)
+        self.assertIn('agentdev fix', result.stdout)
+        self.assertNotIn('26-11-15-no-time', result.stdout)
+        self.assertNotIn('10-00-00-wrong.md', result.stdout)
         self.assertEqual(snapshot(self.root), before)
         self.fix()
         result = self.run_command([sys.executable, ROOT / 'scripts/command/app.py', 'check', self.root], success=False)
-        self.assertNotIn('历史 Note 待迁移', result.stdout)
+        self.assertNotIn('待迁移', result.stdout)
+
+    def test_check_summarizes_many_legacy_notes_and_personal_directories(self):
+        legacy = self.root / 'agent-workspace/legacy-owner/notes'
+        legacy.mkdir(parents=True)
+        for index in range(100):
+            (legacy / f'26-11-15-10-00-00-topic-{index}.md').write_text('# Outcome')
+        before = snapshot(self.root)
+        result = self.run_command([sys.executable, ROOT / 'scripts/command/app.py', 'check', self.root], success=False)
+        self.assertEqual(result.stdout.count('历史 personal / Note 待迁移'), 1)
+        self.assertEqual(result.stdout.count('agentdev fix'), 1)
+        self.assertNotIn('legacy-owner', result.stdout)
+        self.assertNotIn('topic-', result.stdout)
+        self.assertEqual(snapshot(self.root), before)
