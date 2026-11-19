@@ -39,6 +39,37 @@ class FixCommandTests(Sandbox):
         self.assertEqual((old / 'same.md').read_text(), 'OLD')
         self.assertEqual((new / 'same.md').read_text(), 'NEW')
         self.assertEqual((new / 'extra.md').read_text(), 'EXTRA')
+        self.assertNotIn('same.md', result.stdout + result.stderr)
+
+    def test_duplicate_worker_files_are_removed_after_link_normalization(self):
+        root = self.make_project()
+        old = root / 'agent-workspace/test-owner/change/001-example'
+        new = root / 'agent-workspace/workers/test-owner/change/001-example'
+        old.mkdir(parents=True)
+        new.mkdir(parents=True)
+        (old / 'spec.md').write_bytes(b'[rules](../../../skills/common/sdd/constraints.md)\r\n')
+        (new / 'spec.md').write_bytes(b'[rules](../../../../skills/common/sdd/constraints.md)\r\n')
+        for folder in (old, new):
+            (folder / 'data.bin').write_bytes(b'\x00\xff')
+        before = snapshot(new)
+        result = self.invoke('fix', root)
+        self.assertIn('冲突 0 项', result.stdout)
+        self.assertFalse((root / 'agent-workspace/test-owner').exists())
+        self.assertEqual(snapshot(new), before)
+        before = snapshot(root)
+        self.invoke('fix', root)
+        self.assertEqual(snapshot(root), before)
+
+    def test_identical_link_text_with_different_targets_is_not_deleted(self):
+        root = self.make_project()
+        old = root / 'agent-workspace/test-owner/change/001-example/spec.md'
+        new = root / 'agent-workspace/workers/test-owner/change/001-example/spec.md'
+        for path in (old, new):
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b'[rules](../../../skills/common/sdd/constraints.md)\r\n')
+        before = snapshot(root)
+        self.invoke('fix', root, success=False)
+        self.assertEqual(snapshot(root), before)
 
     def test_workers_symlink_is_rejected_without_touching_its_target(self):
         root = self.make_project()

@@ -91,6 +91,21 @@ def validate(project):
     return project
 
 
+def relocated_links(data, source, destination, ws):
+    if source.suffix != '.md':
+        return data
+
+    def replace(match):
+        target = Path(os.path.normpath(source.parent / os.fsdecode(match[1])))
+        try:
+            target.relative_to(ws / 'skills')
+        except ValueError:
+            return match[0]
+        return b'](' + os.fsencode(os.path.relpath(target, destination.parent)) + b')'
+
+    return SHARED_LINK.sub(replace, data)
+
+
 def repair_links(source, destination, ws):
     """仅修正已移动 Markdown 中指向共享 skills 的相对链接，保留其他字节。"""
     files = [destination] if destination.is_file() else (
@@ -101,31 +116,33 @@ def repair_links(source, destination, ws):
             continue
         old = source if destination.is_file() else source / file.relative_to(destination)
         data = file.read_bytes()
-        def replace(match):
-            target = Path(os.path.normpath(old.parent / os.fsdecode(match[1])))
-            try:
-                target.relative_to(ws / "skills")
-            except ValueError:
-                return match[0]
-            return b"](" + os.fsencode(os.path.relpath(target, file.parent)) + b")"
-        changed = SHARED_LINK.sub(replace, data)
+        changed = relocated_links(data, old, file, ws)
         if changed != data:
             file.write_bytes(changed)
 
 
-def move_tree(source, destination, ws, conflicts):
-    if destination.is_symlink():
+def move_tree(source, destination, ws, conflicts, *, repair=True):
+    if source.is_symlink() or destination.is_symlink():
         conflicts.append(str(source.relative_to(ws)))
     elif not destination.exists():
         destination.parent.mkdir(parents=True, exist_ok=True)
         source.rename(destination)
-        if not destination.is_symlink():
+        if repair:
             repair_links(source, destination, ws)
     elif not source.is_symlink() and source.is_dir() and destination.is_dir():
         for child in sorted(source.iterdir()):
-            move_tree(child, destination / child.name, ws, conflicts)
+            move_tree(child, destination / child.name, ws, conflicts, repair=repair)
         if not any(source.iterdir()):
             source.rmdir()
+    elif source.is_file() and destination.is_file():
+        data = source.read_bytes()
+        if repair:
+            data = relocated_links(data, source, destination, ws)
+        # 目标完整保存源内容时，才清理旧副本；链接修正不应造成假冲突。
+        if data == destination.read_bytes():
+            source.unlink()
+        else:
+            conflicts.append(str(source.relative_to(ws)))
     else:
         conflicts.append(str(source.relative_to(ws)))
 
@@ -168,13 +185,15 @@ def fix_notes_directory(notes, *, verbose=True):
     migrated = skipped = 0
     moves = note_moves(notes)
     for source, target in moves:
-        if not safe_path(target, notes) or target.exists():
-            print(f'跳过（目标已存在或路径为符号链接，保留原文件）：{source.relative_to(notes)} → {target.relative_to(notes)}')
+        if not safe_path(target, notes):
             skipped += 1
             continue
-        target.parent.mkdir(parents=True, exist_ok=True)
-        source.rename(target)
-        migrated += 1
+        conflicts = []
+        move_tree(source, target, notes, conflicts, repair=False)
+        if conflicts:
+            skipped += 1
+        else:
+            migrated += 1
     if verbose:
         print(f'Note 迁移完成：已迁移 {migrated} 个，目标已存在跳过 {skipped} 个（保留原文件）')
     return migrated, skipped
@@ -203,11 +222,9 @@ def fix_workspace(project):
     for source in candidates:
         move_tree(source, ws / "workers" / source.name, ws, conflicts)
     print(f"personal 迁移：处理 {len(candidates)} 个旧目录，冲突 {len(conflicts)} 项")
-    for path in conflicts:
-        print(f"冲突保留源文件和目标文件：agent-workspace/{path}")
     fix_notes(project, user=user)
     if conflicts:
-        raise RuntimeError("个人目录迁移存在冲突；请处理以上文件后重试 agentdev fix")
+        raise RuntimeError(f"个人目录迁移存在 {len(conflicts)} 项内容或路径冲突，已保留两边；请处理后重试 agentdev fix")
 
 
 if __name__ == "__main__":
