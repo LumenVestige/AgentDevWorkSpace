@@ -36,6 +36,7 @@ class FixCommandTests(Sandbox):
         (old / 'extra.md').write_text('EXTRA')
         result = self.invoke('fix', root, success=False)
         self.assertIn('冲突', result.stdout + result.stderr)
+        self.assertIn('冲突 1 项', result.stdout)
         self.assertEqual((old / 'same.md').read_text(), 'OLD')
         self.assertEqual((new / 'same.md').read_text(), 'NEW')
         self.assertEqual((new / 'extra.md').read_text(), 'EXTRA')
@@ -60,16 +61,48 @@ class FixCommandTests(Sandbox):
         self.invoke('fix', root)
         self.assertEqual(snapshot(root), before)
 
-    def test_identical_link_text_with_different_targets_is_not_deleted(self):
+    def test_identical_worker_files_are_removed_before_link_normalization(self):
         root = self.make_project()
         old = root / 'agent-workspace/test-owner/change/001-example/spec.md'
         new = root / 'agent-workspace/workers/test-owner/change/001-example/spec.md'
         for path in (old, new):
             path.parent.mkdir(parents=True)
             path.write_bytes(b'[rules](../../../skills/common/sdd/constraints.md)\r\n')
+        before = new.read_bytes()
+        result = self.invoke('fix', root)
+        self.assertIn('冲突 0 项', result.stdout)
+        self.assertFalse((root / 'agent-workspace/test-owner').exists())
+        self.assertEqual(new.read_bytes(), before)
+
+    def test_recheck_personal_conflicts_after_note_classification(self):
+        root = self.make_project()
+        plain = self.legacy_note(root, content=b'# Plain note\r\n')
+        new = root / 'agent-workspace/workers/test-owner/notes'
+        new.mkdir(parents=True)
+        committed = b'## Commits\n- abcdef0 [fix] recorded\n'
+        (new / plain.name).write_bytes(committed)
+        result = self.invoke('fix', root)
+        self.assertIn('冲突 0 项', result.stdout)
+        self.assertFalse((root / 'agent-workspace/test-owner').exists())
+        self.assertEqual((new / 'large-scale-file-change/2026-11-17/10-20-30-topic.md').read_bytes(), b'# Plain note\r\n')
+        self.assertEqual((new / 'git-commit-change/2026-11-17/10-20-30-topic.md').read_bytes(), committed)
         before = snapshot(root)
-        self.invoke('fix', root, success=False)
+        self.invoke('fix', root)
         self.assertEqual(snapshot(root), before)
+
+    def test_recheck_keeps_different_notes_at_their_final_paths(self):
+        root = self.make_project()
+        self.legacy_note(root, content=b'# OLD MUST REMAIN\r\n')
+        new = root / 'agent-workspace/workers/test-owner/notes'
+        new.mkdir(parents=True)
+        (new / '26-11-17-10-20-30-topic.md').write_bytes(b'# NEW MUST REMAIN\r\n')
+        result = self.invoke('fix', root, success=False)
+        self.assertIn('冲突 1 项', result.stdout)
+        relative = 'large-scale-file-change/2026-11-17/10-20-30-topic.md'
+        old = root / 'agent-workspace/test-owner/notes' / relative
+        self.assertEqual(old.read_bytes(), b'# OLD MUST REMAIN\r\n')
+        self.assertEqual((new / relative).read_bytes(), b'# NEW MUST REMAIN\r\n')
+        self.assertFalse((root / 'agent-workspace/test-owner/notes/26-11-17-10-20-30-topic.md').exists())
 
     def test_workers_symlink_is_rejected_without_touching_its_target(self):
         root = self.make_project()

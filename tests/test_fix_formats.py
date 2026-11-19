@@ -132,6 +132,19 @@ class LegacyFormats(Sandbox):
         self.assertIn('跳过 2 个', result.stdout)
         self.assertEqual(snapshot(self.root), before)
 
+    def test_remove_empty_ancestors_after_reclassifying_duplicate_notes(self):
+        source = self.write('git-commit-change/2026-11-15/evidence/deep/summary.md', b'# Outcome\r\n')
+        target = self.write('large-scale-file-change/2026-11-15/evidence/deep/summary.md', b'# Outcome\r\n')
+        before = snapshot(target.parent.parent)
+        self.fix()
+        self.assertFalse(source.exists())
+        self.assertFalse((self.notes / 'git-commit-change').exists())
+        self.assertTrue(self.notes.is_dir())
+        self.assertEqual(snapshot(target.parent.parent), before)
+        before = snapshot(self.root)
+        self.fix()
+        self.assertEqual(snapshot(self.root), before)
+
     def test_invalid_dates_unrelated_and_symlinks_remain_untouched(self):
         self.write('26-02-30-invalid.md', b'invalid')
         self.write('README.md', b'readme')

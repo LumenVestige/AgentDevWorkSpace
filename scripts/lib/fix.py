@@ -136,10 +136,9 @@ def move_tree(source, destination, ws, conflicts, *, repair=True):
             source.rmdir()
     elif source.is_file() and destination.is_file():
         data = source.read_bytes()
-        if repair:
-            data = relocated_links(data, source, destination, ws)
+        target_data = destination.read_bytes()
         # 目标完整保存源内容时，才清理旧副本；链接修正不应造成假冲突。
-        if data == destination.read_bytes():
+        if data == target_data or (repair and relocated_links(data, source, destination, ws) == target_data):
             source.unlink()
         else:
             conflicts.append(str(source.relative_to(ws)))
@@ -180,6 +179,13 @@ def note_moves(notes):
     return moves
 
 
+def prune_empty_parents(path, root):
+    """清理已迁走条目的空父目录，保留 notes 边界，不沿符号链接。"""
+    while path != root and safe_path(path, root) and path.is_dir() and not any(path.iterdir()):
+        path.rmdir()
+        path = path.parent
+
+
 def fix_notes_directory(notes, *, verbose=True):
     """只触及指定 notes，保留定点修复 API。"""
     migrated = skipped = 0
@@ -194,6 +200,7 @@ def fix_notes_directory(notes, *, verbose=True):
             skipped += 1
         else:
             migrated += 1
+            prune_empty_parents(source.parent, notes)
     if verbose:
         print(f'Note 迁移完成：已迁移 {migrated} 个，目标已存在跳过 {skipped} 个（保留原文件）')
     return migrated, skipped
@@ -221,8 +228,14 @@ def fix_workspace(project):
     candidates = legacy_workers(ws, user)
     for source in candidates:
         move_tree(source, ws / "workers" / source.name, ws, conflicts)
-    print(f"personal 迁移：处理 {len(candidates)} 个旧目录，冲突 {len(conflicts)} 项")
     fix_notes(project, user=user)
+    if conflicts:
+        # Note 分类会改变冲突条目的路径，按最终位置重新合并和校验。
+        conflicts = []
+        for source in candidates:
+            if source.exists():
+                move_tree(source, ws / "workers" / source.name, ws, conflicts)
+    print(f"personal 迁移：处理 {len(candidates)} 个旧目录，冲突 {len(conflicts)} 项")
     if conflicts:
         raise RuntimeError(f"个人目录迁移存在 {len(conflicts)} 项内容或路径冲突，已保留两边；请处理后重试 agentdev fix")
 
