@@ -5,3 +5,4 @@ __pycache__/
 /agent-workspace/.agent/
 /agent-workspace/
 /tests/workspace/
+/agent-workspace/workers/

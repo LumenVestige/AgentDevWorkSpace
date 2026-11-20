@@ -8,7 +8,7 @@ import sys
 sys.dont_write_bytecode = True
 parser = argparse.ArgumentParser()
 parser.add_argument("--agentdev", action="store_true")
-parser.add_argument("--client", choices=("claude", "codex"))
+parser.add_argument("--client", choices=("claude", "codex", "agy"))
 parser.add_argument("--project", type=Path, required=True)
 parser.add_argument("script")
 args = parser.parse_args()
@@ -27,3 +27,5 @@ if script.is_file():
     sys.path.insert(0, str(script.parent))
     sys.argv = [str(script)]
     runpy.run_path(str(script), run_name="__main__")
+elif args.client == "agy":
+    sys.exit(f"工作区缺少 skill：{args.script}，请执行 agentdev init 刷新。")

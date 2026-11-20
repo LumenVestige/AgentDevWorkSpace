@@ -67,7 +67,7 @@ agent-workspace/.agent/env/venv/bin/python agent-workspace/skills/common/notes/v
 - 版本使用大版本.小版本.补丁版本的整数三元组比较，例如 0.9.10 > 0.9.2；兼容读取旧一、两段版本并补齐三段。唯一版本源是主仓库 master 的 publish/version，旧配置地址自动映射，init 会保留注释并迁移。发现更新时提示“发现远端版本更新，由本地0.3.0版本更新到0.3.1版本”。
 - 后台进程使用 POSIX 会话分离与存活检查；全局程序使用安装级内核更新锁与安装互斥锁，多项目等待后复用已完成升级并刷新各自工作区。
 - 手动和自动更新原子写入安装根目录（app/ 外）的 update-status.json，记录任务、阶段、起止时间、版本、结果及独立 logs/update-<id>.log 路径；--check/无升级不覆盖状态。CLI 可用 agentdev update --status [--watch] 查看。
-- Claude Code、Codex 和普通 CLI 统一使用 macOS osascript/Linux notify-send 系统通知，仅实际更新成功完成时发送一次；开始、中间阶段、失败、暂停、无需更新及只读检查均不通知。无需外置更新插件，不修改宿主启动脚本或全局客户端配置。保留 --notify/AGENTDEV_NOTIFY 开关；缺少通知环境不会影响升级，系统通知时长受桌面策略控制。新注册 hook 通过 --client 明确传播调用客户端。
+- Claude Code、Codex、Antigravity（agy）和普通 CLI 统一使用 macOS osascript/Linux notify-send 系统通知，仅实际更新成功完成时发送一次；开始、中间阶段、失败、暂停、无需更新及只读检查均不通知。无需外置更新插件，不修改宿主启动脚本或全局客户端配置。保留 --notify/AGENTDEV_NOTIFY 开关；缺少通知环境不会影响升级，系统通知时长受桌面策略控制。新注册 hook 通过 --client 明确传播调用客户端。agy 的 Stop 使用 decision/reason JSON 适配 Note 校验的续跑与放行，后台未空闲时跳过。
 - 欢迎语查询版本时同时检查受管理安装的 Git 状态：未提交文件、分支或 HEAD 偏移会显示风险并暂停自动覆盖；hook 的内部 --project 更新调用保留同样保护。手动 agentdev/adev update 会强制覆盖安装目录改动，同版本发现风险也重新安装；风险文案提示“执行[agentdev update]进行强制覆盖更新。”。agentdev check 只读检查安装改动并继续工作区检查，风险时返回非零，不查询远端。无 .git 的旧快照提示无法检查，后续更新可迁移到独立 master 工作树；当前业务项目的修改不作为安装风险。
 
 skill 运行时优先使用 `agent-workspace/.agent/env/python-path` 记录的共享解释器；旧项目本地 venv 为兼容回退。新项目保留 `venv/` 兼容链接。

@@ -24,8 +24,9 @@ description: Spec-Driven Development 流程。用户输入「创建feature:<名�
 - 创建后告诉用户目录的路径，然后从下面流程的第 0 步开始。
 
 每次新对话开始或 `/clear` 时，SessionStart hook 输出这些快捷命令（`welcome.md`），显示时机取决于客户端；欢迎语同时运行只读 `agentdev check`，检测环境和历史 personal/Note，需迁移时提示 `agentdev fix`。
-Codex、Claude 仅通过官方 hook 回调或外置插件接入，欢迎语显示时机由客户端决定；
+Codex、Claude、Antigravity（agy）仅通过官方 hook 回调或外置插件接入，欢迎语显示时机由客户端决定；
 不得通过修改宿主启动脚本、shell 启动配置或同名命令转发来提前展示，也不要让 Agent 在首次回复复述欢迎语。
+agy 1.5.13 的 SessionStart 在首条消息、首次模型调用前触发；受宿主显示接口问题影响，欢迎语/check 文本仅作为系统上下文加载，TUI 不显示欢迎语。不得把协议测试通过视为显示验收。
 
 ## 约束
 
@@ -43,7 +44,7 @@ Codex、Claude 仅通过官方 hook 回调或外置插件接入，欢迎语显�
 - 由 `init.sh` 从本 skill 的 `personal-constraints.md` 复制，已有时不覆盖；初始内容是示例，按个人习惯修改；
 - 编号用 P1、P2…，与通用约束的 C 编号区分；
 - 与通用约束冲突时以通用约束为准，在 spec 的约束检查中说明。
-- 独立 `load_constraints.py` SessionStart hook 在启动、恢复、clear 和 compact 后将通用约束及当前用户 `specs/**/*.md` 加载到 Agent 上下文；不依赖 welcome.py，读取错误明确报错。每个开发任务前仍须重新读取源文件，避免会话内修改后使用旧约束。
+- 独立 `load_constraints.py` SessionStart hook 将通用约束及当前用户 `specs/**/*.md` 加载到 Agent 上下文；Claude/Codex 支持启动、恢复、clear 和 compact，agy 使用官方新会话 SessionStart，经协议适配直接注入上下文。不依赖 welcome.py，读取错误明确报错。每个开发任务前仍须重新读取源文件，避免会话内修改后使用旧约束。
 
 ## 目录
 

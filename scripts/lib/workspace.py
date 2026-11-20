@@ -17,6 +17,8 @@ REPOSITORY = "https://github.com/LumenVestige/AgentDevWorkSpace.git"
 MARK_BEGIN = "<!-- agentskill:begin 以下内容由 AgentDevWorkSpace 的 init.sh 追加，重新执行时会被替换，请勿修改 -->"
 MARK_END = "<!-- agentskill:end -->"
 SCRIPTS = {"Stop": ("notes/verify.py", "sdd/check_layout.py"), "SessionStart": ("sdd/welcome.py", "sdd/load_constraints.py")}
+HOOK_PATHS = (".claude/settings.local.json", ".codex/hooks.json", ".agents/hooks.json")
+AGY_GROUP = "agentdev-workspace"
 
 
 def git(root, *args):
@@ -189,6 +191,11 @@ def load_json(path):
 
 
 def hook_command(py, source, project, script, client=None):
+    if client == "agy":
+        event = next(event for event, scripts in SCRIPTS.items() if script in scripts)
+        return shlex.join([str(py), "-B", str(source / "scripts/lib/agy_hook.py"),
+                           "--agentdev", "--client", "agy", "--project", str(project),
+                           "--event", event, script])
     args = [str(py), "-B", str(source / "scripts/lib/run_skill.py"), "--agentdev", "--project", str(project), script]
     if client:
         args[4:4] = ["--client", client]
@@ -196,10 +203,57 @@ def hook_command(py, source, project, script, client=None):
 
 
 def own_hook(command):
-    return "# agentskill" in command or ("run_skill.py" in command and "--agentdev" in command)
+    return "# agentskill" in command or (any(name in command for name in ("run_skill.py", "agy_hook.py"))
+                                         and "--agentdev" in command)
+
+
+def load_agy_hooks(path):
+    if path.is_symlink() or path.parent.is_symlink():
+        raise ValueError(f"agy hook 配置不能是符号链接：{path}")
+    cfg = json.loads(path.read_text(encoding="utf-8") or "{}") if path.exists() else {}
+    if not isinstance(cfg, dict):
+        raise ValueError(f"agy hooks 必须是命名分组对象：{path}")
+    for name, group in cfg.items():
+        if name == "$schema":
+            continue
+        if not isinstance(group, dict):
+            raise ValueError(f"agy hook 分组必须是对象：{path} {name}")
+        if "enabled" in group and not isinstance(group["enabled"], bool):
+            raise ValueError(f"agy hook enabled 必须是布尔值：{path} {name}")
+        for event in (*SCRIPTS, "PreInvocation", "PostInvocation", "PreToolUse", "PostToolUse"):
+            if event not in group:
+                continue
+            handlers = group[event]
+            if not isinstance(handlers, list):
+                raise ValueError(f"agy hook 事件必须是数组：{path} {event}")
+            for handler in handlers:
+                if not isinstance(handler, dict):
+                    raise ValueError(f"agy hook handler 必须是对象：{path} {event}")
+                commands = handler.get("hooks", []) if event in {"PreToolUse", "PostToolUse"} else [handler]
+                if not isinstance(commands, list) or any(not isinstance(h, dict) or
+                        not isinstance(h.get("command"), str) for h in commands):
+                    raise ValueError(f"agy hook command 必须是字符串：{path} {event}")
+    return cfg
+
+
+def hook_commands(path, cfg, event):
+    if path.parent.name == ".agents":
+        return [h.get("command", "") for group in cfg.values()
+                if isinstance(group, dict) and group.get("enabled", True)
+                for h in group.get(event, [])]
+    return [h.get("command", "") for entry in cfg.get("hooks", {}).get(event, [])
+            for h in entry.get("hooks", [])]
 
 
 def register_hooks(path, cfg, py, source, project):
+    if path.parent.name == ".agents":
+        group = cfg.setdefault(AGY_GROUP, {})
+        for event, scripts in SCRIPTS.items():
+            kept = [h for h in group.get(event, []) if not own_hook(h.get("command", ""))]
+            group[event] = kept + [{"type": "command", "command": hook_command(py, source, project, script, "agy"),
+                                    "timeout": 90} for script in scripts]
+        write_if_changed(path, json.dumps(cfg, indent=2, ensure_ascii=False) + "\n")
+        return
     events = cfg.setdefault("hooks", {})
     for event, scripts in SCRIPTS.items():
         kept = []
@@ -259,13 +313,16 @@ def initialize(source, home, project):
     if git_root and Path(git_root).resolve() != project:
         raise RuntimeError("请在 Git 仓库根目录执行 agentdev init，避免创建嵌套工作区")
     source_repository = is_source_repository(project)
+    # Templates may come from a checkout; executable hooks always use app/.
+    runtime_source = home / "app"
     py = home / "venv" / "bin/python"
     install_dependencies(source, home)
     errors = runtime_errors(py, source)
     if errors:
         raise RuntimeError("；".join(errors))
     user = project_settings(project, py, source)["personal"]
-    configs = {path: load_json(path) for path in (project / ".claude/settings.local.json", project / ".codex/hooks.json")}
+    configs = {project / relative: (load_agy_hooks if relative.startswith('.agents/') else load_json)(project / relative)
+               for relative in HOOK_PATHS}
     ws = project / "agent-workspace"
     env = ws / ".agent/env"
     for path in (env, ws / ".agent/tmp", ws / ".agent/profiles", ws / ".agent/evals", ws / "skills/custom", ws / "config", ws / "workers" / user / "specs", ws / "workers" / user / "notes"):
@@ -285,7 +342,7 @@ def initialize(source, home, project):
         else:
             shutil.copy2(common / "notes/config.json5", config)
     project_settings(project, py, source, migrate=True)
-    write_if_changed(env / "agentskill-path", str(source) + "\n")
+    write_if_changed(env / "agentskill-path", str(runtime_source) + "\n")
     write_if_changed(env / "python-path", str(py) + "\n")
     write_if_changed(env / "agentskill-version", (source / "publish/version").read_text(encoding="utf-8"))
     if not (env / "venv").exists() and not (env / "venv").is_symlink():
@@ -298,19 +355,22 @@ def initialize(source, home, project):
     # 主仓库自己的规则是模板源，不写入受管引用。
     if not source_repository:
         sync_agent_rules(project, source, managed)
-    link_or_copy(project / "CLAUDE.md", agents, managed)
+    for name in ("CLAUDE.md", "GEMINI.md"):
+        link_or_copy(project / name, agents, managed)
     for name in sorted({path.name for directory in (common, ws / "skills/custom") for path in directory.iterdir() if path.is_dir()}):
         target = ws / "skills/custom" / name
         if not target.is_dir():
             target = common / name
-        link_or_copy(project / ".claude/skills" / name, target, managed)
+        for directory in (".claude/skills", ".agents/skills"):
+            link_or_copy(project / directory / name, target, managed)
     write_if_changed(env / "managed-links.json", json.dumps(managed, indent=2, ensure_ascii=False) + "\n")
     if not source_repository:
         append_lines(project / ".gitignore", ["/agent-workspace/config/", "/agent-workspace/.agent/", "/agent-workspace/.agent/tmp/", "/agent-workspace/workers/*/specs/", "/agent-workspace/*/specs/"])
     if git_root:
         exclude = Path(git(project, "rev-parse", "--git-path", "info/exclude"))
         exclude = exclude if exclude.is_absolute() else project / exclude
-        append_lines(exclude, ["/AGENTS.md", "/CLAUDE.md", "/.claude/skills/", "/.claude/settings.local.json", "/.codex/hooks.json"])
+        append_lines(exclude, ["/AGENTS.md", "/CLAUDE.md", "/GEMINI.md", "/.claude/skills/", "/.claude/settings.local.json", "/.codex/hooks.json",
+                               "/.agents/skills/", "/.agents/hooks.json"])
         hook = Path(git(project, "rev-parse", "--git-path", "hooks/commit-msg"))
         hook = hook if hook.is_absolute() else project / hook
         if not hook.exists() or "# agentskill" in hook.read_text(encoding="utf-8", errors="replace"):
@@ -318,9 +378,10 @@ def initialize(source, home, project):
             hook.chmod(0o755)
         git(project, "config", "agentskill.python", str(py))
     for path, cfg in configs.items():
-        register_hooks(path, cfg, py, source, project)
+        register_hooks(path, cfg, py, runtime_source, project)
     print(f"已初始化：{project}（agent-workspace/workers/{user}，共享运行时 {py}）")
     print("Codex 首次使用项目 hook 时，请在客户端中信任本项目及相关 hook。")
+    print("Antigravity CLI（agy）使用官方 .agents/hooks.json；可在 /hooks 中确认加载。")
 
 
 def check_workspace(project):
@@ -356,14 +417,15 @@ def check_workspace(project):
             errors.append("AgentDevWorkSpace 安装路径不存在，请重新 agentdev init")
     else:
         errors.append("缺少 agentskill-path，请执行 agentdev init")
-    for path in (project / ".claude/settings.local.json", project / ".codex/hooks.json"):
+    for relative in HOOK_PATHS:
+        path = project / relative
         try:
-            cfg = load_json(path)
+            cfg = (load_agy_hooks if path.parent.name == ".agents" else load_json)(path)
             for event, scripts in SCRIPTS.items():
-                commands = [hook.get("command", "").replace("\\", "/") for entry in cfg.get("hooks", {}).get(event, []) for hook in entry.get("hooks", [])]
+                commands = [command.replace("\\", "/") for command in hook_commands(path, cfg, event)]
                 for script in scripts:
                     if not any(script in command for command in commands):
-                        errors.append(f"缺少 hook：{path.name} {event} {script}")
+                        errors.append(f"缺少 hook：{path.relative_to(project)} {event} {script}")
         except (OSError, ValueError) as error:
             errors.append(f"hook 配置错误：{error}")
     pending = migration_issues(project, user)

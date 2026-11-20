@@ -6,7 +6,7 @@
 - 只跑覆盖本次改动的检查，汇报实际跑过的命令。
 - 未经用户要求，不 commit、不 push、不做破坏性操作。
 - 每次开始开发任务前，按 config.json5 的 personal（兼容 peronsal）确定当前用户，读取 custom 优先的 sdd/constraints.md 和该用户 specs/ 下的 Markdown 约束；恢复/压缩会话或约束变更后重新读取，不能只依赖先前会话的摘要。不得借用其他用户的个人约束；spec/plan 逐条检查适用约束。
-- Codex、Claude 只能通过官方提供的 hook 回调或外置插件接入；不得修改宿主启动脚本、shell 启动配置，或通过同名函数、别名和命令包装器接管宿主启动。
+- Codex、Claude、Antigravity（agy）只能通过官方提供的 hook 回调或外置插件接入；不得修改宿主启动脚本、shell 启动配置，或通过同名函数、别名和命令包装器接管宿主启动。
 
 ## agent-workspace/ 目录
 
@@ -28,7 +28,7 @@
 
 ## Skills
 
-SDD 流程、Note、Git 提交规则和开发知识库检索封装成 skill，在 `agent-workspace/skills/common/` 下；`init.sh` 把每个 skill 链接到 `.claude/skills/`（Claude Code 按需加载，同名时指向 `custom/`）。用到时读取对应的 `SKILL.md`（`custom/` 中有同名 skill 时读 `custom/` 中的）：
+SDD 流程、Note、Git 提交规则和开发知识库检索封装成 skill，在 `agent-workspace/skills/common/` 下；`init.sh` 把每个 skill 链接到 `.claude/skills/` 和 `.agents/skills/`（客户端按需加载，同名时指向 `custom/`）。`.agents/` 是 agy 官方项目配置目录，不作为临时目录使用。用到时读取对应的 `SKILL.md`（`custom/` 中有同名 skill 时读 `custom/` 中的）：
 
 - `sdd`（`agent-workspace/skills/common/sdd/SKILL.md`）：用户输入「创建feature:<名称>」「创建bugfix:<名称>」「创建change:<名称>」「创建research:<名称>」（或 new_feature / new_bugfix / new_change / new_research <名称>）时，按它创建对应的目录；新功能和跨模块的改动，必须先读通用开发约束和个人约束，再按它写 spec / plan / tasks，spec 中逐条做约束检查后才能实现。
 - `notes`（`agent-workspace/skills/common/notes/SKILL.md`）：改变行为、架构、接口或数据格式的改动，必须写一条 Note；Stop hook 提示有提交尚未记录到 Note、或工作区有大规模改动时，按它创建。

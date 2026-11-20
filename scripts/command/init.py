@@ -5,7 +5,7 @@ from lib.workspace import initialize, check_workspace
 
 
 def register(commands):
-    parser = commands.add_parser("init", help="安装共享依赖并初始化当前目录的 agent-workspace/")
+    parser = commands.add_parser("init", help="安装共享依赖并初始化工作区及 Claude/Codex/agy 接入")
     parser.add_argument("directory", nargs="?", default=".")
     parser.set_defaults(handler=execute)
 

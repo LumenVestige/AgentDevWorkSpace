@@ -85,7 +85,7 @@ class UpdateState(Sandbox):
     def test_only_success_notifies_once_after_completion_for_all_clients(self):
         with patch.dict(os.environ, {'AGENTDEV_NOTIFY': 'system'}), \
                 patch.object(status, 'desktop_notify', return_value=True) as notify:
-            for client in ('claude', 'codex', 'cli'):
+            for client in ('claude', 'codex', 'agy', 'cli'):
                 with self.subTest(client=client), patch.dict(os.environ, {'AGENTDEV_CLIENT': client}):
                     notify.reset_mock()
                     task = self.task()

@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -93,6 +94,8 @@ class SourceWorkspaceTests(unittest.TestCase):
                          (self.source / "publish/version").read_text())
         for path in (project / ".claude/settings.local.json", project / ".codex/hooks.json"):
             self.assertIn("Stop", json.loads(path.read_text())["hooks"])
+        self.assertIn('Stop', json.loads((project / '.agents/hooks.json').read_text())['agentdev-workspace'])
+        self.assertTrue((project / '.agents/skills/sdd/SKILL.md').is_file())
 
     def test_update_preserves_source_files_with_or_without_new_version(self):
         project = self.project()
@@ -133,12 +136,32 @@ class SourceWorkspaceTests(unittest.TestCase):
         self.assertNotIn("## 工作方式", text)
         self.assertEqual((project / "agent-workspace/AGENTS.md").read_bytes(),
                          (self.source / "AGENTS.md").read_bytes())
-        self.assertEqual((project / "CLAUDE.md").read_text(), text)
+        for name in ("CLAUDE.md", "GEMINI.md"):
+            self.assertEqual((project / name).read_text(), text)
+
+    def test_init_hooks_use_installation_with_a_separate_template_directory(self):
+        project = self.project(source=False)
+        template = self.base / "template checkout"
+        shutil.copytree(self.source, template)
+        workspace.initialize(template, self.home, project)
+        pointer = project / "agent-workspace/.agent/env/agentskill-path"
+        self.assertEqual(pointer.read_text().strip(), str(self.source))
+        for relative in workspace.HOOK_PATHS:
+            path = project / relative
+            cfg = json.loads(path.read_text())
+            for event in workspace.SCRIPTS:
+                for command in workspace.hook_commands(path, cfg, event):
+                    args = shlex.split(command)
+                    self.assertEqual(args[0], str(self.home / "venv/bin/python"))
+                    launcher = "agy_hook.py" if path.parent.name == ".agents" else "run_skill.py"
+                    self.assertEqual(args[2], str(self.source / "scripts/lib" / launcher))
 
     def test_init_references_rules_and_refreshes_only_referenced_file(self):
         project = self.project(source=False)
         workspace.initialize(self.source, self.home, project)
         self.assert_agent_reference(project)
+        self.assertEqual((project / "GEMINI.md").readlink(), Path("AGENTS.md"))
+        self.assertIn("/GEMINI.md", (project / ".git/info/exclude").read_text().splitlines())
         agents = project / "AGENTS.md"
         before = agents.read_bytes(), agents.stat().st_mtime_ns
         self.assertIn("# Local rules\nKeep these exact bytes.", agents.read_text())
@@ -223,7 +246,8 @@ class SourceWorkspaceTests(unittest.TestCase):
             self.assert_agent_reference(project)
             workspace.initialize(self.source, self.home, project)
             self.assert_agent_reference(project)
-        self.assertFalse((project / "CLAUDE.md").is_symlink())
+        for name in ("CLAUDE.md", "GEMINI.md"):
+            self.assertFalse((project / name).is_symlink())
 
     def test_init_preserves_source_symlinks_and_their_targets(self):
         project = self.project()

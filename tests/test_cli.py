@@ -5,6 +5,7 @@ import importlib.util
 import json
 import os
 import shutil
+import shlex
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,51 @@ class GlobalCLI(unittest.TestCase):
         command = cfg['hooks']['SessionStart'][0]['hooks'][0]['command']
         result = subprocess.run(command, shell=True, cwd=root, env=self.env, capture_output=True, text=True, check=True)
         self.assertEqual(json.loads(result.stdout)['systemMessage'], 'CUSTOM_HOOK')
+
+    def test_agy_hooks_and_skills_use_official_project_configuration(self):
+        root = self.project('agy hook execution')
+        hooks = root / '.agents/hooks.json'
+        hooks.parent.mkdir()
+        foreign = {'Stop': [{'command': 'echo USER_HOOK'}]}
+        stale = workspace.hook_command(self.py, self.source, root, 'sdd/welcome.py', 'agy')
+        hooks.write_text(json.dumps({'user-hook': foreign, 'agentdev-workspace': {
+            'SessionStart': [{'command': stale}]}}))
+        result = subprocess.run([str(self.py), '-B', str(self.source / 'scripts/command/app.py'), 'init'],
+                                cwd=root, env=self.env, capture_output=True, text=True, timeout=120)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue((root / '.agents/skills/sdd/SKILL.md').is_file())
+        self.assertEqual((root / 'GEMINI.md').readlink(), Path('AGENTS.md'))
+        custom = root / 'agent-workspace/skills/custom/sdd'
+        custom.mkdir()
+        (custom / 'welcome.py').write_text('import json\nprint(json.dumps({"systemMessage":"AGY WELCOME"}))\n')
+        cfg = json.loads(hooks.read_text())
+        self.assertEqual(cfg['user-hook'], foreign)
+        for handlers in cfg['agentdev-workspace'].values():
+            for handler in handlers:
+                args = shlex.split(handler['command'])
+                self.assertEqual(args[0], str(self.py))
+                self.assertEqual(args[2], str(self.home / 'app/scripts/lib/agy_hook.py'))
+                self.assertEqual(args[args.index('--project') + 1], str(root))
+        command = next(h['command'] for h in cfg['agentdev-workspace']['SessionStart'] if 'welcome.py' in h['command'])
+        result = subprocess.run(command, shell=True, cwd=root, env=self.env, input='{}',
+                                capture_output=True, text=True, check=True)
+        step = json.loads(result.stdout)['injectSteps'][0]['systemMessage']
+        self.assertIn('AGY WELCOME', step['systemMessage'])
+        self.assertNotIn('renderInfo', step)
+        before = hooks.read_bytes()
+        self.invoke('init', cwd=root)
+        self.assertEqual(hooks.read_bytes(), before)
+
+    def test_invalid_agy_config_is_rejected_before_workspace_writes(self):
+        for i, value in enumerate(('[]', '{"group":{"SessionStart":{}}}',
+                                   '{"group":{"Stop":[{"command":5}]}}')):
+            root = self.project(f'invalid agy hooks {i}')
+            path = root / '.agents/hooks.json'
+            path.parent.mkdir()
+            path.write_text(value)
+            before = snapshot(root)
+            self.invoke('init', cwd=root, success=False)
+            self.assertEqual(snapshot(root), before)
 
     def test_invalid_cli_and_nonzero_errors(self):
         self.invoke('unknown-command', success=False)

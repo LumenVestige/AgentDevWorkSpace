@@ -69,11 +69,11 @@ agentdev update --status --watch  # 持续查看；结束结果保留至完成�
 agentdev update --notify none     # 本次不发系统通知
 ```
 
-`--notify auto|system|none` 默认 `auto`，Claude、Codex 和普通 CLI 统一使用系统通知；`AGENTDEV_NOTIFY` 可设置默认方式，显式非 auto 参数优先。`AGENTDEV_CLIENT=claude|codex` 指明调用客户端，新注册的 hook 自动传递。`--status --watch` 输出普通文本，不擦除终端历史，完成后等待 10 秒退出；日志与最终状态均保留。
+`--notify auto|system|none` 默认 `auto`，Claude、Codex、agy 和普通 CLI 统一使用系统通知；`AGENTDEV_NOTIFY` 可设置默认方式，显式非 auto 参数优先。`AGENTDEV_CLIENT=claude|codex|agy` 指明调用客户端，新注册的 hook 自动传递。`--status --watch` 输出普通文本，不擦除终端历史，完成后等待 10 秒退出；日志与最终状态均保留。
 
-### 4.1 Claude Code / Codex：系统通知
+### 4.1 Claude Code / Codex / agy：系统通知
 
-两端均无需外置更新插件或客户端补丁。实际更新成功完成后只发送一条系统通知；开始和中间阶段不通知，失败、暂停、无需更新及只读检查也不通知。阶段细节和失败原因可在 CLI 状态查询及任务日志查看。
+三个客户端均无需外置更新插件或客户端补丁。实际更新成功完成后只发送一条系统通知；开始和中间阶段不通知，失败、暂停、无需更新及只读检查也不通知。阶段细节和失败原因可在 CLI 状态查询及任务日志查看。
 
 - macOS：已有的 `osascript`，固定 AppleScript + 参数传入，不拼接脚本。
 - Linux：已有的 `notify-send`，请求 10000ms 超时；缺少通知工具/桌面环境、SSH 会话、通知服务不可用或发送超时均不影响更新，不自动安装依赖。
@@ -99,8 +99,8 @@ AgentDevWorkSpace · 更新成功：0.3.0 → 0.4.0
 - `skills/common/` 每次从全局模板整体刷新；`skills/custom/` 保留，同名时优先。
 - 按统一命名规则在 `agent-workspace/workers/<personal>/` 创建个人目录、`specs/constraints.md` 和 `notes/`，保留已有内容；不再自动迁移旧版平铺 Note，迁移须显式运行 `agentdev fix`。
 - `config/config.json5` 不存在时从模板复制；`.agent/env/python-path` 和 `agentskill-path` 记录共享解释器及全局程序位置。
-- 保留项目原有 `AGENTS.md` 内容，标记块只引用 `agent-workspace/AGENTS.md`，通用规则同步到该独立文件，不再追加规则全文；再次初始化会替换旧的受管明文块，并迁移未被用户修改的受管入口。用户自建符号链接和已修改的受管副本保持不变。链接 `CLAUDE.md` 和 `.claude/skills/`；链接不可用时复制，并保留复制后被用户修改的文件。
-- 注册 Claude Code 和 Codex 的 Stop / SessionStart hook，保留其他 hook；由共享 Python 启动器选择 custom 优先的脚本。Codex 中仍需由用户信任项目及 hook。
+- 保留项目原有 `AGENTS.md` 内容，标记块只引用 `agent-workspace/AGENTS.md`，通用规则同步到该独立文件，不再追加规则全文；再次初始化会替换旧的受管明文块，并迁移未被用户修改的受管入口。用户自建符号链接和已修改的受管副本保持不变。`CLAUDE.md` 和 `GEMINI.md` 均链接到项目根目录的 `AGENTS.md`，另链接 `.claude/skills/` 和 agy 官方 `.agents/skills/`；链接不可用时复制，并保留复制后被用户修改的文件。
+- init 默认注册 Claude Code、Codex 和 Antigravity CLI（agy）的 Stop / SessionStart hook，保留其他 hook；启动器始终使用安装根目录的 `app/scripts/lib/`（agy 为 `agy_hook.py`），解释器使用安装根目录的 `venv/bin/python`，`--project` 指向业务项目。即使从源码入口执行 init，也不把 hook 挂到源码目录；再次 init 会替换旧的受管源码路径。共享启动器选择项目中 custom 优先的 skill 脚本。Codex 中仍需由用户信任项目及 hook。
 - Git 项目安装提交标签校验 hook（已有其他 hook 时保留）；非 Git 项目跳过。SDD 快捷脚本直接使用本机 POSIX shell。
 - `.gitignore` 忽略工作区配置、`.agent/` 和个人约束；工具生成的客户端配置和链接不纳入 Git。
 
@@ -181,9 +181,23 @@ SDD 新编号/同名检查、布局检查和知识检索覆盖已归档需求；
 
 ## 8. 宿主接入与欢迎语
 
-Codex、Claude 仅通过官方提供的 hook 回调或外置插件接入。不得修改宿主启动脚本或 shell 启动配置，也不得用同名函数、别名或命令包装器接管宿主启动。
+Codex、Claude、Antigravity（agy）仅通过官方提供的 hook 回调或外置插件接入。不得修改宿主启动脚本或 shell 启动配置，也不得用同名函数、别名或命令包装器接管宿主启动。
 
-欢迎语由官方 SessionStart hook 输出，显示时机由客户端决定；不通过启动转发脚本保证输入首条消息前展示。hook 使用项目的 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），展示版本信息和 SDD 快捷命令。欢迎语同时运行只读 `check`，展示环境及历史数据迁移提示；发现待迁移项时提示 `agentdev fix`。更新成功完成后，两端统一发送系统通知。
+欢迎语由官方 SessionStart hook 输出，显示能力和时机由客户端决定（agy 1.5.13 的显示限制见下文）；不通过启动转发脚本保证输入首条消息前展示。hook 使用项目的 `agent-workspace/skills/custom/sdd/welcome.md`（不存在时使用 common），生成版本信息和 SDD 快捷命令。欢迎语同时运行只读 `check`，包含环境及历史数据迁移提示；发现待迁移项时提示 `agentdev fix`。更新成功完成后，三个客户端统一发送系统通知。
+
+### Antigravity CLI（agy）
+
+支持并已核对 `agy 1.5.13` 的官方项目级 hook 接口。先更新 AgentDevWorkSpace 安装版，再在项目执行 `agentdev init`，然后直接启动 `agy`；源码目录的修改不会自动替换已安装的 init 或 hook 启动器。无需额外插件、shell 函数或启动包装脚本。
+
+- `.agents/hooks.json` 使用 agy 的命名 hook 分组和 flat handler，保留已有用户配置；重复 init 不重复注册，用户手动禁用的分组不会被重新启用。
+- `.agents/skills/` 提供现有 skill，custom 优先；`.agents` 仅存放 agy 官方配置，不存临时文件。
+- 新会话首条消息、首次模型调用前，`SessionStart` 将欢迎语文本、版本/check 信息和当前用户约束注入系统上下文；agy 1.5.13 的 TUI 不显示这些系统消息，因此本版本的可见欢迎语尚未实现。不伪造用户消息或要求模型复述。
+- agy 1.5.13 的 `metadata.user_markdown` 显示接口会触发 hook panic，`renderInfo` 标记为 `internal_only`，会被宿主过滤。适配器仅使用公开的 `systemMessage` 字段，保留完整上下文。不会把正常欢迎语放入会使回合失败的错误通道。
+- 启动后可用 `/hooks` 确认 `agentdev-workspace` 分组是否启用，`/skills` 检查 skill；hook 已加载不代表 TUI 能显示欢迎语。
+- `Stop` 把 Note/布局校验结果适配为 `decision=continue` 和 `reason`；后台任务未空闲时不执行校验，重复续跑保持防循环行为。
+- `agentdev check` 也检查 agy hook；更新仍仅在成功完成时发送一次系统通知。
+
+接口依据：[官方 hooks](https://antigravity.google/docs/hooks)、[官方 skill 发现](https://antigravity.google/docs/skills)、[metadata 上游问题 #1394](https://github.com/google-antigravity/antigravity-cli/issues/1394)。本机诊断日志确认已加载 hook，且曾触发同样的 metadata panic；配置校验和协议测试不作为 TUI 显示验收。
 
 ## 9. 版本与发布
 
@@ -222,7 +236,8 @@ scripts/lib/installer.py   全局安装、运行时、PATH 与安装锁
 scripts/lib/repository.py  独立 master 工作树安装与 Git 改动风险检查
 scripts/lib/setup.py       仅供根 setup.sh 调用的安装实现
 scripts/lib/workspace.py   工作区初始化、只读检查及链接/复制
-scripts/lib/run_skill.py   hook 分发
+scripts/lib/run_skill.py   共享 hook 分发（claude / codex / agy）
+scripts/lib/agy_hook.py    agy 官方 hook 请求和响应适配
 scripts/lib/deps.sh        共享依赖清单与手动依赖安装辅助入口
 scripts/lib/               bootstrap、旧 Note 迁移、shell 路径辅助
 publish/publish.sh         发布：默认补丁 +1，支持指定三段版本，只提交并推送主仓库

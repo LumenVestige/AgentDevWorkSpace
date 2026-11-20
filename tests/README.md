@@ -35,14 +35,15 @@ AGENTDEV_TEST_WHEELS="$PWD/tests/workspace/wheels" \
 
 | 测试文件 | 方法数 | 验证的行为 |
 | --- | ---: | --- |
+| `test_agy.py` | 10 | agy 命名/flat hook、幂等及禁用分组、custom 优先、公开字段传递完整欢迎语/check 与约束上下文、Stop 续跑/空闲/防循环、缺失脚本提示与只读 check；不调用模型，不验证 TUI 显示 |
 | `test_agentdev.py` | 5 | adev 别名、参数与退出码转发、shell 激活（不再重载 setup 环境）、重装后入口 |
-| `test_update_status.py` | 23 | 原子 JSON/完整字段/失败清理、两端统一通知路由、成功完成仅通知一次、失败/暂停/开始静默、开关覆盖、macOS 参数/Linux 超时/无桌面与 SSH 降级、真实 Git 升级、并发两项目仅一次完成通知且各自刷新、自动 hook 共用状态、只读查询/到期退出、失败及风险终态 |
+| `test_update_status.py` | 23 | 原子 JSON/完整字段/失败清理、三个客户端统一通知路由、成功完成仅通知一次、失败/暂停/开始静默、开关覆盖、macOS 参数/Linux 超时/无桌面与 SSH 降级、真实 Git 升级、并发两项目仅一次完成通知且各自刷新、自动 hook 共用状态、只读查询/到期退出、失败及风险终态 |
 | `test_repository.py` | 31 | 真实 master 独立安装、完整树与 dirty 源保留、忽略私有文件、暂存/未暂存/删除/未跟踪、HEAD/分支、Git 异常/超时、旧快照迁移、worktree/symlink、CLI 与欢迎语风险、阻止覆盖及只读性；同版本补齐 .git、原 commit 恢复、异常保留阻断、错误基准拒绝、下载/元数据失败回滚、现有 Git 不替换、恢复后继续升级 |
 | `test_layout.py` | 7 | 移除 setup 及别名、帮助命令列表、command/lib 分层、旧 Python 入口转发 |
 | `test_version.py` | 10 | 每个接口独立 5 秒超时、API 限流与 HTTP/网络错误回退、响应内容校验 |
 | `test_fix.py` | 14 | 多人 personal 迁移至 workers、旧 Note 迁移、共享约束链接修正、冲突与符号链接保护、重复执行、check 只读迁移提示、兼容入口 |
-| `test_workspace.py` | 17 | 源码工作区保护、AGENTS 文件引用与旧规则迁移、受管文件保留和刷新 |
-| `test_cli.py` | 40 | 默认帮助、所有命令和别名；通过 setup.sh 真实隔离安装/重装；Git/非 Git 初始化后自动 check；check 只读；非法 hook 在写入前拒绝；公共 skill 刷新、自定义与个人文件保留；实际 commit hook；解释器指针；bash/zsh source 激活；旧入口清理；真实本地 master 更新和工作区刷新 |
+| `test_workspace.py` | 18 | 源码工作区保护、AGENTS 文件引用与旧规则迁移、受管文件保留和刷新、模板目录与安装 runtime 分离 |
+| `test_cli.py` | 42 | 默认帮助、所有命令和别名；通过 setup.sh 真实隔离安装/重装；Git/非 Git 初始化后自动 check；check 只读；非法 hook 在写入前拒绝；公共 skill 刷新、自定义与个人文件保留；实际 commit hook；解释器指针；bash/zsh source 激活；旧入口清理；真实本地 master 更新和工作区刷新 |
 | `test_config.py` | 14 | JSON5/注释、嵌套默认值合并、配置格式拒绝、新旧配置优先级、personal/peronsal、Git/电脑用户名、Unicode、安全目录名、保留注释迁移版本源、自定义版本源保持原样 |
 | `test_installer.py` | 10 | 默认全局路径、拒绝覆盖非托管目录与源码、符号链接保护、锁释放、依赖/激活写入失败回滚、公布版本与源码不一致、bash 用户配置保留、未安装状态的错误 |
 | `test_notes.py` | 14 | 提交扫描与 Note 记录闭环、其他人的记录、Note 自身提交排除、路径过滤、基线恢复、关闭开关、大改动文件/行阈值和撤销后重新增长、二进制忽略、无损合并与再次合并、文件碰撞保护、新旧 workers/个人目录的 Note 扫描、旧 Note 迁移 |
